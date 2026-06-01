@@ -19,10 +19,13 @@ namespace GTAWorld.Game.Editor
             "Opsive.ThirdPersonController.Wrappers.AnimatorMonitor",
             "Opsive.ThirdPersonController.Wrappers.CharacterIK",
             "Opsive.ThirdPersonController.Wrappers.ItemHandler",
+            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
+        };
+
+        private static readonly string[] OpsiveInspectorMismatchComponents = {
             "Opsive.ThirdPersonController.Wrappers.CharacterHealth",
             "Opsive.ThirdPersonController.Wrappers.CharacterFootsteps",
-            "Opsive.ThirdPersonController.Wrappers.Inventory",
-            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
+            "Opsive.ThirdPersonController.Wrappers.Inventory"
         };
 
         private static readonly string[] OpsiveAvatarAbilities = {
@@ -186,6 +189,7 @@ namespace GTAWorld.Game.Editor
                 AddComponentByName(avatar, "UMA.CharacterSystem.DynamicCharacterAvatar", false);
             }
 
+            RemoveComponentsByName(avatar, OpsiveInspectorMismatchComponents);
             AddComponentsByName(avatar, OpsiveCharacterComponents);
             AddComponentsByName(avatar, OpsiveAvatarAbilities);
 
@@ -419,6 +423,21 @@ namespace GTAWorld.Game.Editor
                 component = Undo.AddComponent<T>(target);
             }
             return component;
+        }
+
+        private static void RemoveComponentsByName(GameObject target, string[] typeNames)
+        {
+            for (int i = 0; i < typeNames.Length; i++) {
+                var type = FindType(typeNames[i]);
+                if (type == null || !typeof(Component).IsAssignableFrom(type)) {
+                    continue;
+                }
+
+                var component = target.GetComponent(type);
+                if (component != null) {
+                    Undo.DestroyObjectImmediate(component);
+                }
+            }
         }
 
         private static void AddComponentsByName(GameObject target, string[] typeNames)

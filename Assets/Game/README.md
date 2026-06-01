@@ -31,3 +31,7 @@ Dopo la compilazione trovi i menu in **Tools > Game**:
 ## Nota networking
 
 Il vecchio UNet di Unity non è necessario per l'obiettivo attuale. Mantieni disattivata l'opzione `Is Networked` finché non scegli un sistema multiplayer moderno.
+
+## Compatibilita legacy UNet
+
+Il progetto include anche uno shim minimale `Assets/Game/Compatibility/UnityEngine.Networking` per permettere al DLL legacy di Opsive di caricarsi in Unity moderno quando manca il vecchio assembly `UnityEngine.Networking`. Non implementa multiplayer reale: serve solo a evitare che il plugin venga scaricato come assembly rotto. Per multiplayer vero scegli in seguito una soluzione moderna e rimuovi/sostituisci questo shim se installi un pacchetto che fornisce davvero `UnityEngine.Networking`.

@@ -46,8 +46,12 @@ namespace Opsive.ThirdPersonController.Editor
             // Loop through and store all of the possible ability types.
             var allAbilityTypes = new List<Type>();
             for (int i = 0; i < assemblies.Length; ++i) {
-                var assemblyTypes = assemblies[i].GetTypes();
+                var assemblyTypes = GetLoadableTypes(assemblies[i]);
                 for (int j = 0; j < assemblyTypes.Length; ++j) {
+                    if (assemblyTypes[j] == null) {
+                        continue;
+                    }
+
                     // Must derive from Ability.
                     if (!typeof(Ability).IsAssignableFrom(assemblyTypes[j])) {
                         continue;
@@ -441,6 +445,18 @@ namespace Opsive.ThirdPersonController.Editor
             }
             PlayerSettings.SetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup, symbols);
             AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Gets all loadable types from an assembly, ignoring legacy plugin references that are unavailable in this Unity version.
+        /// </summary>
+        private static Type[] GetLoadableTypes(Assembly assembly)
+        {
+            try {
+                return assembly.GetTypes();
+            } catch (ReflectionTypeLoadException e) {
+                return e.Types;
+            }
         }
 
         /// <summary>

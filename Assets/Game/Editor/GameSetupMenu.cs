@@ -17,15 +17,15 @@ namespace GTAWorld.Game.Editor
         private static readonly string[] OpsiveCharacterComponents = {
             "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController",
             "Opsive.ThirdPersonController.Wrappers.AnimatorMonitor",
-            "Opsive.ThirdPersonController.Wrappers.CharacterIK",
-            "Opsive.ThirdPersonController.Wrappers.ItemHandler",
-            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
+            "Opsive.ThirdPersonController.Wrappers.CharacterIK"
         };
 
         private static readonly string[] OpsiveInspectorMismatchComponents = {
+            "Opsive.ThirdPersonController.Wrappers.ItemHandler",
             "Opsive.ThirdPersonController.Wrappers.CharacterHealth",
             "Opsive.ThirdPersonController.Wrappers.CharacterFootsteps",
-            "Opsive.ThirdPersonController.Wrappers.Inventory"
+            "Opsive.ThirdPersonController.Wrappers.Inventory",
+            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
         };
 
         private static readonly string[] OpsiveAvatarAbilities = {
@@ -201,6 +201,8 @@ namespace GTAWorld.Game.Editor
             integration.Animator = avatar.GetComponentInChildren<Animator>();
             integration.WeaponMounts = mounts;
             integration.AutoBind();
+
+            EnsureComponent<GameSimplePlayerMover>(avatar);
         }
 
         private static GameObject CreateOrUpdateGameBootstrap()

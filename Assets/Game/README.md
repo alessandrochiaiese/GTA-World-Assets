@@ -25,8 +25,9 @@ Dopo la compilazione trovi i menu in **Tools > Game**:
 4. Usa il Character Builder di Opsive solo in modalità locale/non-networked per ora.
 5. Configura vestiti e DNA dal componente `GameAvatarIntegration` o chiamando i suoi metodi da UI/gameplay.
 6. Configura prefab armi usando i mount creati da `GameWeaponMounts`.
-7. Premi Play e usa il pannello demo: F1/F2 cambiano sesso/race UMA, F3 randomizza alcuni DNA demo, 1-4 mostrano armi preview sui mount.
-8. I pickup armi e i placeholder cavallo/veicolo creati dal menu sono una base da rifinire con gli item type, animator e prefab definitivi di Opsive.
+7. Premi Play e usa il pannello demo: i bottoni cambiano sesso/race UMA, randomizzano alcuni DNA demo e mostrano armi preview sui mount. Puoi anche usare F1/F2/F3/1-4/H quando la Game view ha il focus.
+8. Muovi il player con WASD/frecce e Shift per sprint usando il mover fallback compatibile con Input System.
+9. I pickup armi e i placeholder cavallo/veicolo creati dal menu sono una base da rifinire con gli item type, animator e prefab definitivi di Opsive.
 
 ## Nota networking
 

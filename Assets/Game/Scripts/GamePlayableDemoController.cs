@@ -30,36 +30,9 @@ namespace GTAWorld.Game
             AutoBind();
         }
 
-        private void Update()
-        {
-            if (Input.GetKeyDown(KeyCode.F1)) {
-                SetMale();
-            }
-            if (Input.GetKeyDown(KeyCode.F2)) {
-                SetFemale();
-            }
-            if (Input.GetKeyDown(KeyCode.F3)) {
-                RandomizeDemoDna();
-            }
-            if (Input.GetKeyDown(KeyCode.Alpha1)) {
-                EquipPreviewWeapon(0);
-            }
-            if (Input.GetKeyDown(KeyCode.Alpha2)) {
-                EquipPreviewWeapon(1);
-            }
-            if (Input.GetKeyDown(KeyCode.Alpha3)) {
-                EquipPreviewWeapon(2);
-            }
-            if (Input.GetKeyDown(KeyCode.Alpha4)) {
-                EquipPreviewWeapon(3);
-            }
-            if (Input.GetKeyDown(KeyCode.H)) {
-                m_ShowHelp = !m_ShowHelp;
-            }
-        }
-
         private void OnGUI()
         {
+            HandleGuiKeyboardShortcuts();
             if (!m_ShowHelp) {
                 return;
             }
@@ -96,6 +69,40 @@ namespace GTAWorld.Game
             }
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
+        }
+
+        private void HandleGuiKeyboardShortcuts()
+        {
+            var currentEvent = Event.current;
+            if (currentEvent == null || currentEvent.type != EventType.KeyDown) {
+                return;
+            }
+
+            if (currentEvent.keyCode == KeyCode.F1) {
+                SetMale();
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.F2) {
+                SetFemale();
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.F3) {
+                RandomizeDemoDna();
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.Alpha1) {
+                EquipPreviewWeapon(0);
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.Alpha2) {
+                EquipPreviewWeapon(1);
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.Alpha3) {
+                EquipPreviewWeapon(2);
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.Alpha4) {
+                EquipPreviewWeapon(3);
+                currentEvent.Use();
+            } else if (currentEvent.keyCode == KeyCode.H) {
+                m_ShowHelp = !m_ShowHelp;
+                currentEvent.Use();
+            }
         }
 
         [ContextMenu("Auto Bind Demo References")]

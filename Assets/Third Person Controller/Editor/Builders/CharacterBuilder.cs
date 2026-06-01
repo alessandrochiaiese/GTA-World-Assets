@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using UnityEngine.Networking;
 using UnityEditor;
 using System;
 using System.IO;
@@ -166,7 +165,16 @@ namespace Opsive.ThirdPersonController.Editor
             }
 #endif
             m_IsNetworked = EditorGUILayout.Toggle("Is Networked", m_IsNetworked);
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
             EditorGUILayout.HelpBox("Is this character going to be used on the network with Unity 5's multiplayer implementation?", MessageType.Info);
+#else
+            if (m_IsNetworked) {
+                EditorGUILayout.HelpBox("Legacy Unity 5 multiplayer (UNet) is not available in this project. Leave Is Networked disabled for a local UMA/Opsive character, or add a supported networking integration before building a networked character.", MessageType.Error);
+                canContinue = false;
+            } else {
+                EditorGUILayout.HelpBox("Leave Is Networked disabled for a local UMA/Opsive character. The built-in Opsive network option targets legacy Unity 5 multiplayer (UNet), which is not available in this project.", MessageType.Info);
+            }
+#endif
             if (m_ModelType == ModelType.Humanoid) {
                 m_AddStandardAbilities = EditorGUILayout.Toggle("Add Standard Abilities", m_AddStandardAbilities);
                 m_AddRagdoll = EditorGUILayout.Toggle("Add Ragdoll", m_AddRagdoll);
@@ -221,20 +229,20 @@ namespace Opsive.ThirdPersonController.Editor
             // Call a runtime component to build the character so the character can be built at runtime.
             var isNetworked = m_IsNetworked;
             var baseDirectory = Path.GetDirectoryName(AssetDatabase.GetAssetPath(MonoScript.FromScriptableObject(this))).Replace("Editor/Builders", "");
-            var maxFrictionMaterial = AssetDatabase.LoadAssetAtPath(baseDirectory + "Demos/Shared/Physic Materials/MaxFriction.physicMaterial", typeof(PhysicMaterial)) as PhysicMaterial;
-            var frictionlessMaterial = AssetDatabase.LoadAssetAtPath(baseDirectory + "Demos/Shared/Physic Materials/Frictionless.physicMaterial", typeof(PhysicMaterial)) as PhysicMaterial;
+            var maxFrictionMaterial = AssetDatabase.LoadAssetAtPath(baseDirectory + "Demos/Shared/Physic Materials/MaxFriction.physicMaterial", typeof(PhysicsMaterial)) as PhysicsMaterial;
+            var frictionlessMaterial = AssetDatabase.LoadAssetAtPath(baseDirectory + "Demos/Shared/Physic Materials/Frictionless.physicMaterial", typeof(PhysicsMaterial)) as PhysicsMaterial;
             if (m_ModelType == ModelType.Humanoid) {
                 ThirdPersonController.CharacterBuilder.BuildHumanoidCharacter(m_Character, m_AIAgent, isNetworked, m_MovementType, m_AnimatorController, maxFrictionMaterial, frictionlessMaterial);
             } else {
                 ThirdPersonController.CharacterBuilder.BuildCharacter(m_Character, m_AIAgent, isNetworked, m_MovementType, m_AnimatorController, maxFrictionMaterial, frictionlessMaterial, m_ItemTransforms, m_FootTransforms);
             }
             if (isNetworked) {
-#if !ENABLE_MULTIPLAYER
+#if OPSIVE_LEGACY_UNET && !ENABLE_MULTIPLAYER
                 // The character is networked so enable the multiplayer symbol.
                 RigidbodyCharacterControllerInspector.ToggleMultiplayerSymbol();
 #endif
             } else {
-#if ENABLE_MULTIPLAYER
+#if OPSIVE_LEGACY_UNET && ENABLE_MULTIPLAYER
                 // The character isn't networked so disable the multiplayer symbol.
                 RigidbodyCharacterControllerInspector.ToggleMultiplayerSymbol();
 #endif

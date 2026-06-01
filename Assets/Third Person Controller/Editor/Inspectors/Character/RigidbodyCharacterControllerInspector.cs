@@ -98,22 +98,15 @@ namespace Opsive.ThirdPersonController.Editor
             EditorGUI.BeginChangeCheck();
 
             // Ensure the correct multiplayer symbol is defined.
-#if !(UNITY_4_6 || UNITY_4_7 || UNITY_5_0)
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET && !(UNITY_4_6 || UNITY_4_7 || UNITY_5_0)
             var hasNetworkIdentity = (target as MonoBehaviour).GetComponent<UnityEngine.Networking.NetworkIdentity>() != null;
             var showNetworkToggle = false;
             var removeSymbol = false;
-#if ENABLE_MULTIPLAYER
             if (!hasNetworkIdentity) {
                 EditorGUILayout.HelpBox("ENABLE_MULTIPLAYER is defined but no NetworkIdentity can be found. This symbol needs to be removed.", MessageType.Error);
                 showNetworkToggle = true;
                 removeSymbol = true;
             }
-#else
-            if (hasNetworkIdentity) {
-                EditorGUILayout.HelpBox("A NetworkIdentity was found but ENABLE_MULTIPLAYER is not defined. This symbol needs to be defined.", MessageType.Error);
-                showNetworkToggle = true;
-            }
-#endif
             if (!EditorApplication.isCompiling && showNetworkToggle && GUILayout.Button((removeSymbol ? "Remove" : "Add") + " Multiplayer Symbol")) {
                 ToggleMultiplayerSymbol();
             }

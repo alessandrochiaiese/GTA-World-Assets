@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
+using UnityEngine;
 using UnityEngine.Networking;
 
 namespace Opsive.ThirdPersonController.Demos.Networking
@@ -30,3 +31,4 @@ namespace Opsive.ThirdPersonController.Demos.Networking
         }
     }
 }
+#endif

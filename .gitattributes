@@ -1,0 +1,6 @@
+Assets/**/*.png filter=lfs diff=lfs merge=lfs -text
+Assets/**/*.unity filter=lfs diff=lfs merge=lfs -text
+Assets/**/*.prefab filter=lfs diff=lfs merge=lfs -text
+Assets/**/*.asset filter=lfs diff=lfs merge=lfs -text
+Assets/**/*.fbx filter=lfs diff=lfs merge=lfs -text
+Assets/**/*.mp3 filter=lfs diff=lfs merge=lfs -text

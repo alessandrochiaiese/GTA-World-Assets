@@ -1,5 +1,7 @@
 ﻿using UnityEngine;
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
 using UnityEngine.Networking;
+#endif
 using System.Collections.Generic;
 
 namespace Opsive.ThirdPersonController
@@ -180,11 +182,15 @@ namespace Opsive.ThirdPersonController
         /// </summary>
         private static void BuildNetwork()
         {
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
             m_Character.AddComponent<Opsive.ThirdPersonController.Wrappers.NetworkMonitor>();
             var networkAnimator = m_Character.AddComponent<NetworkAnimator>();
             networkAnimator.animator = m_Character.GetComponent<Animator>();
             var networkTransform = m_Character.AddComponent<NetworkTransform>();
             networkTransform.transformSyncMode = NetworkTransform.TransformSyncMode.SyncTransform;
+#else
+            Debug.LogWarning("Network character support requires Unity's legacy UNet multiplayer API and the ENABLE_MULTIPLAYER scripting symbol. Build the character without networking, or install a supported networking integration before enabling this option.");
+#endif
         }
     }
 }

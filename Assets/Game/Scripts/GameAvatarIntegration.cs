@@ -35,6 +35,8 @@ namespace GTAWorld.Game
         [SerializeField] private string m_FemaleRace = "HumanFemale";
         [SerializeField] private List<DnaValue> m_StartupDna = new List<DnaValue>();
         [SerializeField] private List<WardrobeEntry> m_StartupWardrobe = new List<WardrobeEntry>();
+        [SerializeField] private bool m_ApplyMaleRaceOnStart = true;
+        [SerializeField] private bool m_CreatePrototypeVisualWhenUmaIsEmpty = true;
 
         [Header("Opsive")]
         [Tooltip("Animator used by the Third Person Controller. Auto-filled if empty.")]
@@ -59,8 +61,14 @@ namespace GTAWorld.Game
 
         private void Start()
         {
+            if (m_ApplyMaleRaceOnStart) {
+                SetMale();
+            }
             if (m_ApplyStartupCustomizationOnStart) {
                 ApplyStartupCustomization();
+            }
+            if (m_CreatePrototypeVisualWhenUmaIsEmpty) {
+                EnsurePrototypeVisual();
             }
         }
 
@@ -95,11 +103,13 @@ namespace GTAWorld.Game
         public void SetMale()
         {
             ChangeRace(m_MaleRace);
+            SetPrototypeVisual(false);
         }
 
         public void SetFemale()
         {
             ChangeRace(m_FemaleRace);
+            SetPrototypeVisual(true);
         }
 
         public bool ChangeRace(string raceName, bool force = true)
@@ -157,12 +167,15 @@ namespace GTAWorld.Game
                 return;
             }
 
+            var prototypeScale = 1f;
             foreach (var dna in values) {
                 if (dna == null || string.IsNullOrEmpty(dna.Name)) {
                     continue;
                 }
                 SetDna(dna.Name, dna.Value, dna.RebuildImmediately);
+                prototypeScale += (Mathf.Clamp01(dna.Value) - 0.5f) * 0.04f;
             }
+            SetPrototypeScale(prototypeScale);
         }
 
         public bool SetDna(string dnaName, float value, bool rebuild = false)
@@ -170,12 +183,71 @@ namespace GTAWorld.Game
             if (string.IsNullOrEmpty(dnaName)) {
                 return false;
             }
-            return InvokeUma("SetDNA", new object[] { dnaName, Mathf.Clamp01(value), rebuild });
+            var clampedValue = Mathf.Clamp01(value);
+            var changed = InvokeUma("SetDNA", new object[] { dnaName, clampedValue, rebuild });
+            SetPrototypeScale(0.8f + clampedValue * 0.4f);
+            return changed;
         }
 
         public bool ForceUmaUpdate(bool dnaDirty = true, bool textureDirty = true, bool meshDirty = true)
         {
             return InvokeUma("ForceUpdate", new object[] { dnaDirty, textureDirty, meshDirty });
+        }
+
+        [ContextMenu("Ensure Prototype Visual")]
+        public void EnsurePrototypeVisual()
+        {
+            if (!m_CreatePrototypeVisualWhenUmaIsEmpty || HasVisibleRenderer() || HasPrototypeVisual()) {
+                return;
+            }
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "UMA_Prototype_Visible_Body";
+            body.transform.SetParent(transform, false);
+            body.transform.localPosition = new Vector3(0f, 0.9f, 0f);
+            body.transform.localScale = new Vector3(0.45f, 0.9f, 0.45f);
+
+            var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            head.name = "UMA_Prototype_Visible_Head";
+            head.transform.SetParent(transform, false);
+            head.transform.localPosition = new Vector3(0f, 1.85f, 0f);
+            head.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
+        }
+
+        private bool HasVisibleRenderer()
+        {
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++) {
+                if (renderers[i] != null && !renderers[i].name.StartsWith("UMA_Prototype_Visible_")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool HasPrototypeVisual()
+        {
+            return transform.Find("UMA_Prototype_Visible_Body") != null;
+        }
+
+        private void SetPrototypeVisual(bool female)
+        {
+            EnsurePrototypeVisual();
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            var color = female ? new Color(0.9f, 0.45f, 0.8f) : new Color(0.35f, 0.55f, 1f);
+            for (int i = 0; i < renderers.Length; i++) {
+                if (renderers[i] != null && renderers[i].name.StartsWith("UMA_Prototype_Visible_")) {
+                    renderers[i].sharedMaterial.color = color;
+                }
+            }
+        }
+
+        private void SetPrototypeScale(float scale)
+        {
+            var body = transform.Find("UMA_Prototype_Visible_Body");
+            if (body != null) {
+                body.localScale = new Vector3(0.45f * scale, 0.9f * scale, 0.45f * scale);
+            }
         }
 
         private bool InvokeUma(string methodName, object[] arguments)

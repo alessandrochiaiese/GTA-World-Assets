@@ -21,10 +21,15 @@ namespace GTAWorld.Game.Editor
         };
 
         private static readonly string[] OpsiveInspectorMismatchComponents = {
+            "Opsive.ThirdPersonController.ItemHandler",
             "Opsive.ThirdPersonController.Wrappers.ItemHandler",
+            "Opsive.ThirdPersonController.CharacterHealth",
             "Opsive.ThirdPersonController.Wrappers.CharacterHealth",
+            "Opsive.ThirdPersonController.CharacterFootsteps",
             "Opsive.ThirdPersonController.Wrappers.CharacterFootsteps",
+            "Opsive.ThirdPersonController.Inventory",
             "Opsive.ThirdPersonController.Wrappers.Inventory",
+            "Opsive.ThirdPersonController.Input.UnityInput",
             "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
         };
 
@@ -201,6 +206,8 @@ namespace GTAWorld.Game.Editor
             integration.Animator = avatar.GetComponentInChildren<Animator>();
             integration.WeaponMounts = mounts;
             integration.AutoBind();
+            integration.EnsurePrototypeVisual();
+            integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
         }
@@ -435,9 +442,11 @@ namespace GTAWorld.Game.Editor
                     continue;
                 }
 
-                var component = target.GetComponent(type);
-                if (component != null) {
-                    Undo.DestroyObjectImmediate(component);
+                var components = target.GetComponentsInChildren(type, true);
+                for (int j = 0; j < components.Length; j++) {
+                    if (components[j] != null) {
+                        Undo.DestroyObjectImmediate(components[j]);
+                    }
                 }
             }
         }

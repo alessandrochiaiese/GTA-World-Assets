@@ -24,9 +24,20 @@ namespace Opsive.ThirdPersonController.Editor
             serializedObject.Update();
             EditorGUI.BeginChangeCheck();
 
-            EditorGUILayout.PropertyField(PropertyFromName(serializedObject, "m_Feet"), true);
-            EditorGUILayout.PropertyField(PropertyFromName(serializedObject, "m_PerFootSounds"), true);
-            EditorGUILayout.PropertyField(PropertyFromName(serializedObject, "m_Footsteps"), true);
+            var feetProperty = PropertyFromName(serializedObject, "m_Feet");
+            if (feetProperty != null) {
+                EditorGUILayout.PropertyField(feetProperty, true);
+            }
+            var perFootSoundsProperty = PropertyFromName(serializedObject, "m_PerFootSounds");
+            if (perFootSoundsProperty != null) {
+                EditorGUILayout.PropertyField(perFootSoundsProperty, true);
+            }
+            var footstepsProperty = PropertyFromName(serializedObject, "m_Footsteps");
+            if (footstepsProperty != null) {
+                EditorGUILayout.PropertyField(footstepsProperty, true);
+            } else {
+                EditorGUILayout.HelpBox("Footstep presets are not available on this legacy runtime component.", MessageType.Info);
+            }
 
             if (EditorGUI.EndChangeCheck()) {
                 Undo.RecordObject(characterFootsteps, "Inspector");

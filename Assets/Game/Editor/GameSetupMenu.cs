@@ -80,6 +80,21 @@ namespace GTAWorld.Game.Editor
             "Assets/Third Person Controller/Demos/Clean Scene/Prefabs/Bow Pickup.prefab"
         };
 
+
+        private static readonly string[] OpsiveFullSystemComponents = {
+            "Opsive.ThirdPersonController.Wrappers.ControllerHandler",
+            "Opsive.ThirdPersonController.Wrappers.Inventory",
+            "Opsive.ThirdPersonController.Wrappers.InventoryHandler",
+            "Opsive.ThirdPersonController.Wrappers.ItemHandler"
+        };
+
+        private static readonly string[] OpsiveLoadoutItemNames = {
+            "GTA_Pistol",
+            "GTA_Rifle",
+            "GTA_Melee",
+            "GTA_Back"
+        };
+
         [MenuItem("Tools/Game/Create Project Folders", false, 0)]
         public static void CreateProjectFolders()
         {
@@ -120,6 +135,27 @@ namespace GTAWorld.Game.Editor
             PrepareAvatarObject(selected, true);
             EditorUtility.SetDirty(selected);
             Debug.Log("Prepared selected avatar for UMA + Opsive integration: " + selected.name, selected);
+        }
+
+        [MenuItem("Tools/Game/Build Full Opsive Character + Item Loadout", false, 22)]
+        public static void BuildFullOpsiveCharacterAndLoadout()
+        {
+            var selected = Selection.activeGameObject;
+            if (selected == null) {
+                EditorUtility.DisplayDialog("Build Full Opsive", "Select the UMA/Opsive avatar GameObject first.", "OK");
+                return;
+            }
+
+            Undo.RegisterFullObjectHierarchyUndo(selected, "Build Full Opsive Character + Item Loadout");
+            ConfigureFullOpsiveSystem(selected);
+            EditorUtility.SetDirty(selected);
+            Debug.Log("Full Opsive character components, item placements and generated loadout were applied to: " + selected.name, selected);
+        }
+
+        [MenuItem("Tools/Game/ONE CLICK - Create Complete GTA Demo", false, -10)]
+        public static void CreateCompleteGtaDemo()
+        {
+            CreateCompletePlayableScene();
         }
 
         [MenuItem("Tools/Game/Create Complete Playable Scene", false, 10)]
@@ -228,6 +264,7 @@ namespace GTAWorld.Game.Editor
             integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
+            ConfigureFullOpsiveSystem(avatar);
         }
 
         private static void CleanupGeneratedSceneObjects()
@@ -406,6 +443,7 @@ namespace GTAWorld.Game.Editor
             controller.Avatar = bootstrap.PlayerAvatar;
             controller.MapAnchor = bootstrap.MapAnchor;
             controller.WeaponMounts = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameWeaponMounts>() : null;
+            controller.OpsiveRuntimeBridge = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameOpsiveRuntimeBridge>() : null;
             controller.SetWeaponPreviewPrefabs(LoadWeaponPreviewPrefabs());
             return controller;
         }
@@ -445,6 +483,198 @@ namespace GTAWorld.Game.Editor
             return root;
         }
 
+        private static void ConfigureFullOpsiveSystem(GameObject avatar)
+        {
+            if (avatar == null) {
+                return;
+            }
+
+            AddComponentsByName(avatar, OpsiveFullSystemComponents);
+            EnsureOpsiveItemPlacements(avatar);
+            var itemTypes = BuildGeneratedOpsiveLoadout(avatar);
+            var runtimeBridge = EnsureComponent<GameOpsiveRuntimeBridge>(avatar);
+            runtimeBridge.SetDefaultItemTypes(itemTypes);
+        }
+
+        private static void EnsureOpsiveItemPlacements(GameObject avatar)
+        {
+            var mounts = avatar.GetComponent<GameWeaponMounts>();
+            if (mounts == null) {
+                mounts = EnsureComponent<GameWeaponMounts>(avatar);
+            }
+            mounts.Animator = avatar.GetComponentInChildren<Animator>();
+            mounts.AutoCreateMounts();
+
+            AddItemPlacement(mounts.RightHandMount);
+            AddItemPlacement(mounts.LeftHandMount);
+            AddItemPlacement(mounts.BackMount);
+            AddItemPlacement(mounts.HipMount);
+        }
+
+        private static void AddItemPlacement(Transform mount)
+        {
+            if (mount == null) {
+                return;
+            }
+            AddComponentByName(mount.gameObject, "Opsive.ThirdPersonController.Wrappers.ItemPlacement", false);
+        }
+
+        private static UnityEngine.Object[] BuildGeneratedOpsiveLoadout(GameObject avatar)
+        {
+            var itemBuilderType = FindType("Opsive.ThirdPersonController.ItemBuilder");
+            var itemTypeType = FindType("Opsive.ThirdPersonController.ItemType");
+            var primaryItemTypeType = FindType("Opsive.ThirdPersonController.Wrappers.PrimaryItemType") ?? FindType("Opsive.ThirdPersonController.PrimaryItemType");
+            if (itemBuilderType == null || itemTypeType == null || primaryItemTypeType == null) {
+                Debug.LogWarning("Opsive item types are not available yet. The avatar still has mounts and fallback weapons, but the real Opsive loadout could not be generated.", avatar);
+                return new UnityEngine.Object[0];
+            }
+
+            var loadoutRoot = FindOrCreateChild(avatar.transform, "Game_Opsive_Loadout");
+            var itemTypes = new UnityEngine.Object[WeaponPreviewPrefabPaths.Length];
+            for (int i = 0; i < WeaponPreviewPrefabPaths.Length; i++) {
+                itemTypes[i] = GetOrCreateOpsiveItemType(primaryItemTypeType, OpsiveLoadoutItemNames[Mathf.Min(i, OpsiveLoadoutItemNames.Length - 1)]);
+                if (itemTypes[i] == null) {
+                    continue;
+                }
+                var itemParent = GetGeneratedItemParent(avatar, loadoutRoot, i);
+                BuildGeneratedOpsiveItem(itemBuilderType, itemTypeType, itemParent, WeaponPreviewPrefabPaths[i], itemTypes[i], OpsiveLoadoutItemNames[Mathf.Min(i, OpsiveLoadoutItemNames.Length - 1)], i == 2 ? "Melee" : "Shootable");
+            }
+
+            ApplyDefaultLoadout(avatar, itemTypes);
+            return itemTypes;
+        }
+
+        private static Transform GetGeneratedItemParent(GameObject avatar, Transform fallbackRoot, int itemIndex)
+        {
+            var mounts = avatar != null ? avatar.GetComponent<GameWeaponMounts>() : null;
+            if (mounts == null) {
+                return fallbackRoot;
+            }
+            if (itemIndex == 3 && mounts.BackMount != null) {
+                return mounts.BackMount;
+            }
+            if (mounts.RightHandMount != null) {
+                return mounts.RightHandMount;
+            }
+            return fallbackRoot;
+        }
+
+        private static UnityEngine.Object GetOrCreateOpsiveItemType(Type itemType, string itemName)
+        {
+            EnsureFolder(GameRoot, "OpsiveGenerated");
+            EnsureFolder(GameRoot + "/OpsiveGenerated", "ItemTypes");
+            var assetPath = GameRoot + "/OpsiveGenerated/ItemTypes/" + itemName + ".asset";
+            var existing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+            if (existing != null) {
+                return existing;
+            }
+
+            var instance = ScriptableObject.CreateInstance(itemType);
+            if (instance == null) {
+                return null;
+            }
+            instance.name = itemName;
+            AssetDatabase.CreateAsset(instance, assetPath);
+            return instance;
+        }
+
+        private static void BuildGeneratedOpsiveItem(Type itemBuilderType, Type itemTypeType, Transform loadoutRoot, string prefabPath, UnityEngine.Object itemType, string itemName, string builderItemType)
+        {
+            if (loadoutRoot == null || itemType == null || !itemTypeType.IsInstanceOfType(itemType)) {
+                return;
+            }
+
+            var existing = loadoutRoot.Find(itemName);
+            if (existing != null) {
+                return;
+            }
+
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            GameObject itemObject = null;
+            if (prefab != null) {
+                itemObject = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            }
+            if (itemObject == null) {
+                itemObject = GameObject.CreatePrimitive(builderItemType == "Melee" ? PrimitiveType.Cube : PrimitiveType.Cylinder);
+            }
+            if (itemObject == null) {
+                return;
+            }
+
+            Undo.RegisterCreatedObjectUndo(itemObject, "Create Opsive Loadout Item");
+            itemObject.name = itemName;
+            itemObject.transform.SetParent(loadoutRoot, false);
+            itemObject.transform.localPosition = Vector3.zero;
+            itemObject.transform.localRotation = Quaternion.identity;
+            StripRuntimePickupComponents(itemObject);
+
+            var itemTypesEnum = itemBuilderType.GetNestedType("ItemTypes");
+            var handAssignmentEnum = itemBuilderType.GetNestedType("HandAssignment");
+            var method = itemBuilderType.GetMethod("BuildItem", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (itemTypesEnum == null || handAssignmentEnum == null || method == null) {
+                return;
+            }
+
+            try {
+                var typeValue = Enum.Parse(itemTypesEnum, builderItemType);
+                var handValue = Enum.Parse(handAssignmentEnum, "Right");
+                method.Invoke(null, new object[] { itemObject, itemType, itemName, typeValue, handValue });
+            } catch (Exception exception) {
+                Debug.LogWarning("Unable to build Opsive item '" + itemName + "'. " + exception.GetBaseException().Message, itemObject);
+            }
+        }
+
+        private static void StripRuntimePickupComponents(GameObject itemObject)
+        {
+            var behaviours = itemObject.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = behaviours.Length - 1; i >= 0; i--) {
+                if (behaviours[i] != null) {
+                    Undo.DestroyObjectImmediate(behaviours[i]);
+                }
+            }
+            var colliders = itemObject.GetComponentsInChildren<Collider>(true);
+            for (int i = colliders.Length - 1; i >= 0; i--) {
+                if (colliders[i] != null) {
+                    Undo.DestroyObjectImmediate(colliders[i]);
+                }
+            }
+            var rigidbodies = itemObject.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = rigidbodies.Length - 1; i >= 0; i--) {
+                if (rigidbodies[i] != null) {
+                    Undo.DestroyObjectImmediate(rigidbodies[i]);
+                }
+            }
+        }
+
+        private static void ApplyDefaultLoadout(GameObject avatar, UnityEngine.Object[] itemTypes)
+        {
+            var inventory = avatar.GetComponent("Inventory") as Component;
+            if (inventory == null || itemTypes == null) {
+                return;
+            }
+
+            var inventoryType = inventory.GetType();
+            var baseInventoryType = FindType("Opsive.ThirdPersonController.Inventory") ?? inventoryType.BaseType;
+            var itemAmountType = baseInventoryType != null ? baseInventoryType.GetNestedType("ItemAmount") : null;
+            var defaultLoadoutProperty = inventoryType.GetProperty("DefaultLoadout") ?? (baseInventoryType != null ? baseInventoryType.GetProperty("DefaultLoadout") : null);
+            if (itemAmountType == null || defaultLoadoutProperty == null || !defaultLoadoutProperty.CanWrite) {
+                return;
+            }
+
+            var validItemTypes = new System.Collections.Generic.List<UnityEngine.Object>();
+            for (int i = 0; i < itemTypes.Length; i++) {
+                if (itemTypes[i] != null) {
+                    validItemTypes.Add(itemTypes[i]);
+                }
+            }
+            var loadout = Array.CreateInstance(itemAmountType, validItemTypes.Count);
+            for (int i = 0; i < validItemTypes.Count; i++) {
+                var itemAmount = Activator.CreateInstance(itemAmountType, validItemTypes[i], 1);
+                loadout.SetValue(itemAmount, i);
+            }
+            defaultLoadoutProperty.SetValue(inventory, loadout, null);
+        }
+
         private static void CreateOsmPlaceholderCity(Transform mapRoot)
         {
             if (mapRoot == null || mapRoot.Find("OSM_Visible_Test_City") != null) {
@@ -455,18 +685,29 @@ namespace GTAWorld.Game.Editor
             Undo.RegisterCreatedObjectUndo(cityRoot.gameObject, "Create OSM Placeholder City");
             cityRoot.SetParent(mapRoot, false);
 
-            for (int i = -2; i <= 2; i++) {
-                CreateRoad(cityRoot, "Road_NS_" + i, new Vector3(i * 6f, 0.02f, 0f), new Vector3(0.35f, 0.02f, 15f));
-                CreateRoad(cityRoot, "Road_EW_" + i, new Vector3(0f, 0.025f, i * 6f), new Vector3(15f, 0.02f, 0.35f));
+            var terrain = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            Undo.RegisterCreatedObjectUndo(terrain, "Create OSM Terrain");
+            terrain.name = "OSM_Green_Terrain_Blockout";
+            terrain.transform.SetParent(cityRoot, false);
+            terrain.transform.localPosition = Vector3.zero;
+            terrain.transform.localScale = new Vector3(18f, 1f, 18f);
+            SetRendererColor(terrain, new Color(0.25f, 0.48f, 0.22f));
+
+            const float blockSpacing = 28f;
+            const float roadLength = 170f;
+            const float roadWidth = 3.8f;
+            for (int i = -3; i <= 3; i++) {
+                CreateRoad(cityRoot, "Road_NS_" + i, new Vector3(i * blockSpacing, 0.04f, 0f), new Vector3(roadWidth, 0.04f, roadLength));
+                CreateRoad(cityRoot, "Road_EW_" + i, new Vector3(0f, 0.045f, i * blockSpacing), new Vector3(roadLength, 0.04f, roadWidth));
             }
 
             var buildingIndex = 0;
-            for (int x = -2; x <= 2; x++) {
-                for (int z = -2; z <= 2; z++) {
-                    if ((x + z) % 2 == 0) {
-                        CreateBuilding(cityRoot, "OSM_Building_" + buildingIndex, new Vector3(x * 6f + 2.2f, 0.75f, z * 6f + 2.2f), 1.5f + ((x + 2 + z + 2) % 4) * 0.45f);
-                        buildingIndex++;
-                    }
+            for (int x = -3; x <= 2; x++) {
+                for (int z = -3; z <= 2; z++) {
+                    var height = 5f + ((x + 3 + z + 3) % 5) * 2.5f;
+                    var offset = new Vector3(x * blockSpacing + 10f, 0f, z * blockSpacing + 10f);
+                    CreateBuilding(cityRoot, "OSM_Building_" + buildingIndex, offset, height);
+                    buildingIndex++;
                 }
             }
         }
@@ -479,7 +720,7 @@ namespace GTAWorld.Game.Editor
             road.transform.SetParent(parent, false);
             road.transform.localPosition = localPosition;
             road.transform.localScale = localScale;
-            SetRendererColor(road, new Color(0.08f, 0.08f, 0.08f));
+            SetRendererColor(road, new Color(0.23f, 0.23f, 0.23f));
         }
 
         private static void CreateBuilding(Transform parent, string name, Vector3 localPosition, float height)
@@ -489,16 +730,34 @@ namespace GTAWorld.Game.Editor
             building.name = name;
             building.transform.SetParent(parent, false);
             building.transform.localPosition = new Vector3(localPosition.x, height * 0.5f, localPosition.z);
-            building.transform.localScale = new Vector3(2f, height, 2f);
-            SetRendererColor(building, new Color(0.55f, 0.58f, 0.62f));
+            building.transform.localScale = new Vector3(11f, height, 11f);
+            SetRendererColor(building, new Color(0.88f, 0.88f, 0.84f));
         }
 
         private static void SetRendererColor(GameObject target, Color color)
         {
             var renderer = target.GetComponent<Renderer>();
-            if (renderer != null) {
-                renderer.sharedMaterial.color = color;
+            if (renderer == null) {
+                return;
             }
+
+            var shader = Shader.Find("Standard");
+            if (shader == null) {
+                shader = Shader.Find("Universal Render Pipeline/Lit");
+            }
+            if (shader == null) {
+                shader = Shader.Find("Diffuse");
+            }
+            if (shader == null) {
+                if (renderer.sharedMaterial != null) {
+                    renderer.sharedMaterial.color = color;
+                }
+                return;
+            }
+
+            var material = new Material(shader);
+            material.color = color;
+            renderer.sharedMaterial = material;
         }
 
         private static Transform CreateRideableGallery(Transform parent)
@@ -529,8 +788,10 @@ namespace GTAWorld.Game.Editor
             Undo.RegisterCreatedObjectUndo(horse, "Create Rideable Horse");
             horse.name = "Horse_Blitz_Rideable";
             horse.transform.SetParent(root, false);
-            horse.transform.localPosition = new Vector3(-4f, 0f, 8f);
+            horse.transform.localPosition = new Vector3(-18f, 0f, 34f);
             horse.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            var rideable = EnsureComponent<GameRideablePlaceholder>(horse);
+            rideable.DisplayName = "Horse";
             AddComponentByName(horse, "Opsive.ThirdPersonController.Wrappers.RideableObject", false);
         }
 
@@ -544,8 +805,11 @@ namespace GTAWorld.Game.Editor
             Undo.RegisterCreatedObjectUndo(vehicle, "Create Vehicle Placeholder");
             vehicle.name = "Vehicle_Car_Placeholder";
             vehicle.transform.SetParent(root, false);
-            vehicle.transform.localPosition = new Vector3(4f, 0.5f, 8f);
-            vehicle.transform.localScale = new Vector3(2f, 1f, 4f);
+            vehicle.transform.localPosition = new Vector3(18f, 0.5f, 34f);
+            vehicle.transform.localScale = new Vector3(4f, 1.4f, 7f);
+            SetRendererColor(vehicle, new Color(0.12f, 0.18f, 0.28f));
+            var rideable = EnsureComponent<GameRideablePlaceholder>(vehicle);
+            rideable.DisplayName = "Vehicle";
             AddComponentByName(vehicle, "Opsive.ThirdPersonController.Wrappers.RideableObject", false);
         }
 
@@ -568,7 +832,8 @@ namespace GTAWorld.Game.Editor
             Undo.RegisterCreatedObjectUndo(ground, "Create Temporary Ground");
             ground.name = "Temporary_Ground_For_OSM_Testing";
             ground.transform.SetParent(parent, false);
-            ground.transform.localScale = new Vector3(12f, 1f, 12f);
+            ground.transform.localScale = new Vector3(20f, 1f, 20f);
+            SetRendererColor(ground, new Color(0.2f, 0.42f, 0.18f));
         }
 
         private static Transform FindOrCreateChild(Transform parent, string name)

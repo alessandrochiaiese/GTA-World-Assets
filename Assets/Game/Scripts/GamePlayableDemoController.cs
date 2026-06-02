@@ -12,6 +12,7 @@ namespace GTAWorld.Game
         [SerializeField] private GameAvatarIntegration m_Avatar;
         [SerializeField] private GameWeaponMounts m_WeaponMounts;
         [SerializeField] private GameOsmMapAnchor m_MapAnchor;
+        [SerializeField] private GameOpsiveRuntimeBridge m_OpsiveRuntimeBridge;
         [SerializeField] private string[] m_DemoDnaNames = { "height", "headSize", "belly", "upperMuscle", "lowerMuscle" };
         [SerializeField] private bool m_ShowHelp = true;
         [SerializeField] private GameObject[] m_WeaponPreviewPrefabs;
@@ -21,6 +22,7 @@ namespace GTAWorld.Game
         public GameAvatarIntegration Avatar { get { return m_Avatar; } set { m_Avatar = value; } }
         public GameWeaponMounts WeaponMounts { get { return m_WeaponMounts; } set { m_WeaponMounts = value; } }
         public GameOsmMapAnchor MapAnchor { get { return m_MapAnchor; } set { m_MapAnchor = value; } }
+        public GameOpsiveRuntimeBridge OpsiveRuntimeBridge { get { return m_OpsiveRuntimeBridge; } set { m_OpsiveRuntimeBridge = value; } }
 
         public void SetWeaponPreviewPrefabs(GameObject[] weaponPreviewPrefabs)
         {
@@ -49,6 +51,9 @@ namespace GTAWorld.Game
             GUILayout.Label("WASD moves the demo avatar; UMA must finish building before the mesh appears.");
             GUILayout.Label("Place generated OSM content under World_Map_Setup/OSM_Map_Root.");
             GUILayout.Label("Status: " + m_StatusMessage);
+            if (m_OpsiveRuntimeBridge != null) {
+                GUILayout.Label("Opsive: " + m_OpsiveRuntimeBridge.StatusMessage);
+            }
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Male")) {
@@ -125,6 +130,9 @@ namespace GTAWorld.Game
             if (m_MapAnchor == null) {
                 m_MapAnchor = GameObject.FindObjectOfType<GameOsmMapAnchor>();
             }
+            if (m_OpsiveRuntimeBridge == null && m_Avatar != null) {
+                m_OpsiveRuntimeBridge = m_Avatar.GetComponent<GameOpsiveRuntimeBridge>();
+            }
         }
 
         public void SetMale()
@@ -169,6 +177,9 @@ namespace GTAWorld.Game
         public void EquipPreviewWeapon(int weaponIndex)
         {
             AutoBind();
+            if (m_OpsiveRuntimeBridge != null) {
+                m_OpsiveRuntimeBridge.EquipSlot(weaponIndex);
+            }
             if (m_WeaponMounts == null) {
                 m_StatusMessage = "Weapon mounts missing";
                 return;
@@ -188,7 +199,34 @@ namespace GTAWorld.Game
             PreparePreviewWeapon(m_CurrentWeaponPreview);
             var mount = weaponIndex == 3 ? GameWeaponMounts.WeaponMount.Back : GameWeaponMounts.WeaponMount.RightHand;
             m_WeaponMounts.AttachWeapon(m_CurrentWeaponPreview, mount, true);
+            NormalizePreviewWeapon(m_CurrentWeaponPreview);
             m_StatusMessage = m_CurrentWeaponPreview.name + " attached to " + mount;
+        }
+
+        private static void NormalizePreviewWeapon(GameObject weapon)
+        {
+            if (weapon == null) {
+                return;
+            }
+
+            var renderers = weapon.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0) {
+                return;
+            }
+
+            var bounds = renderers[0].bounds;
+            for (int i = 1; i < renderers.Length; i++) {
+                bounds.Encapsulate(renderers[i].bounds);
+            }
+
+            var parent = weapon.transform.parent;
+            if (parent == null) {
+                return;
+            }
+
+            var centerOffset = parent.InverseTransformVector(bounds.center - parent.position);
+            weapon.transform.localPosition -= centerOffset;
+            weapon.transform.localScale = Vector3.one * Mathf.Min(1f, 1.2f / Mathf.Max(bounds.size.magnitude, 0.01f));
         }
 
         private static void PreparePreviewWeapon(GameObject weapon)

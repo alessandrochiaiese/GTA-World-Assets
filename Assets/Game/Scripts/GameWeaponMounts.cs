@@ -4,6 +4,7 @@ namespace GTAWorld.Game
 {
     /// <summary>
     /// Creates stable hand/back attachment points for weapons and IK targets on UMA/Opsive avatars.
+    /// UMA can rebuild its skeleton at runtime, so mounts are re-parented to humanoid bones when they become available.
     /// </summary>
     [DisallowMultipleComponent]
     public class GameWeaponMounts : MonoBehaviour
@@ -31,6 +32,20 @@ namespace GTAWorld.Game
         private void Reset()
         {
             AutoCreateMounts();
+        }
+
+        private void LateUpdate()
+        {
+            if (m_Animator == null || !m_Animator.isHuman) {
+                var animator = GetComponentInChildren<Animator>();
+                if (animator != null) {
+                    m_Animator = animator;
+                }
+            }
+
+            if (m_Animator != null && m_Animator.isHuman) {
+                AutoCreateMounts();
+            }
         }
 
         [ContextMenu("Auto Create Weapon Mounts")]
@@ -66,11 +81,8 @@ namespace GTAWorld.Game
                 return;
             }
 
+            AutoCreateMounts();
             var targetMount = GetMount(mount);
-            if (targetMount == null) {
-                AutoCreateMounts();
-                targetMount = GetMount(mount);
-            }
             if (targetMount == null) {
                 Debug.LogWarning("Unable to attach weapon because the requested mount does not exist.", this);
                 return;
@@ -86,30 +98,32 @@ namespace GTAWorld.Game
 
         private Transform EnsureMount(string mountName, HumanBodyBones bone, Transform current, Vector3 localPosition, Quaternion localRotation)
         {
-            if (current != null) {
-                return current;
+            var parent = GetBoneParent(bone);
+            if (current == null) {
+                current = parent.Find(mountName);
+            }
+            if (current == null) {
+                current = new GameObject(mountName).transform;
             }
 
-            var parent = transform;
+            if (current.parent != parent) {
+                current.SetParent(parent, false);
+            }
+            current.localPosition = localPosition;
+            current.localRotation = localRotation;
+            current.localScale = Vector3.one;
+            return current;
+        }
+
+        private Transform GetBoneParent(HumanBodyBones bone)
+        {
             if (m_Animator != null && m_Animator.isHuman) {
                 var boneTransform = m_Animator.GetBoneTransform(bone);
                 if (boneTransform != null) {
-                    parent = boneTransform;
+                    return boneTransform;
                 }
             }
-
-            var existing = parent.Find(mountName);
-            if (existing != null) {
-                return existing;
-            }
-
-            var mountObject = new GameObject(mountName);
-            var mountTransform = mountObject.transform;
-            mountTransform.SetParent(parent, false);
-            mountTransform.localPosition = localPosition;
-            mountTransform.localRotation = localRotation;
-            mountTransform.localScale = Vector3.one;
-            return mountTransform;
+            return transform;
         }
     }
 }

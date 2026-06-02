@@ -7,7 +7,8 @@ namespace GTAWorld.Game
 {
     /// <summary>
     /// Input-System friendly fallback mover for the generated demo scene. It keeps the prototype playable while
-    /// the full Opsive input/item pipeline is configured.
+    /// the full Opsive input/item pipeline is configured. It also drives the Opsive demo animator parameters so
+    /// the avatar does not slide around in the idle pose while the real Opsive controller is being tuned.
     /// </summary>
     [DisallowMultipleComponent]
     public class GameSimplePlayerMover : MonoBehaviour
@@ -16,8 +17,13 @@ namespace GTAWorld.Game
         [SerializeField] private float m_SprintMultiplier = 1.7f;
         [SerializeField] private float m_RotationSpeed = 12f;
         [SerializeField] private Camera m_Camera;
+        [SerializeField] private Animator m_Animator;
+        [SerializeField] private float m_AnimatorDampTime = 0.08f;
 
         private CharacterController m_CharacterController;
+        private bool m_HasHorizontalInput;
+        private bool m_HasForwardInput;
+        private bool m_HasYaw;
 
         private void Awake()
         {
@@ -25,11 +31,21 @@ namespace GTAWorld.Game
             if (m_Camera == null) {
                 m_Camera = Camera.main;
             }
+            if (m_Animator == null) {
+                m_Animator = GetComponentInChildren<Animator>();
+            }
+            CacheAnimatorParameters();
+        }
+
+        private void OnEnable()
+        {
+            CacheAnimatorParameters();
         }
 
         private void Update()
         {
             var movement = ReadMovement();
+            UpdateAnimator(movement);
             if (movement.sqrMagnitude < 0.001f) {
                 return;
             }
@@ -103,6 +119,56 @@ namespace GTAWorld.Game
             forward.Normalize();
             right.Normalize();
             return (forward * movement.y + right * movement.x).normalized;
+        }
+
+        private void CacheAnimatorParameters()
+        {
+            if (m_Animator == null) {
+                m_Animator = GetComponentInChildren<Animator>();
+            }
+            m_HasHorizontalInput = HasAnimatorParameter("Horizontal Input", AnimatorControllerParameterType.Float);
+            m_HasForwardInput = HasAnimatorParameter("Forward Input", AnimatorControllerParameterType.Float);
+            m_HasYaw = HasAnimatorParameter("Yaw", AnimatorControllerParameterType.Float);
+        }
+
+        private bool HasAnimatorParameter(string parameterName, AnimatorControllerParameterType parameterType)
+        {
+            if (m_Animator == null || m_Animator.runtimeAnimatorController == null) {
+                return false;
+            }
+
+            var parameters = m_Animator.parameters;
+            for (int i = 0; i < parameters.Length; i++) {
+                if (parameters[i].name == parameterName && parameters[i].type == parameterType) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void UpdateAnimator(Vector2 movement)
+        {
+            if (m_Animator == null || m_Animator.runtimeAnimatorController == null) {
+                CacheAnimatorParameters();
+            }
+            if (m_Animator == null || m_Animator.runtimeAnimatorController == null) {
+                return;
+            }
+
+            if (!m_HasHorizontalInput && !m_HasForwardInput && !m_HasYaw) {
+                CacheAnimatorParameters();
+            }
+
+            var dampTime = m_AnimatorDampTime;
+            if (m_HasHorizontalInput) {
+                m_Animator.SetFloat("Horizontal Input", movement.x, dampTime, Time.deltaTime);
+            }
+            if (m_HasForwardInput) {
+                m_Animator.SetFloat("Forward Input", movement.y, dampTime, Time.deltaTime);
+            }
+            if (m_HasYaw) {
+                m_Animator.SetFloat("Yaw", movement.x, dampTime, Time.deltaTime);
+            }
         }
     }
 }

@@ -203,23 +203,25 @@ namespace GTAWorld.Game.Editor
             var opsivePlayer = FindOpsivePlayerCandidate();
             if (opsivePlayer == null) {
                 Debug.LogWarning("Copied the Opsive shooter scene but could not find its character controller. A UMA/Opsive player will be generated instead.");
-                var anchor = CreateOrUpdateOsmMapSetup();
+                var anchor = CreateOrUpdateMapAnchor();
                 var generatedPlayer = CreateOrUpdatePlayerAvatar(anchor);
                 CreateOrUpdateGameplayCamera(generatedPlayer != null ? generatedPlayer.transform : null);
             } else {
                 ConvertOpsiveScenePlayerToUma(opsivePlayer);
-                var anchor = CreateOrUpdateOsmMapSetup();
+                var anchor = CreateOrUpdateMapAnchor();
                 if (anchor != null) {
                     anchor.PlayerSpawnPoint = opsivePlayer.transform;
-                    CreatePlaceholderMapBlockout(anchor.transform);
+                    CreateOsmPlaceholderCity(anchor.MapRoot);
                 }
                 CreateOrUpdateGameplayCamera(opsivePlayer.transform);
             }
 
-            var bootstrap = CreateOrUpdateSceneBootstrap();
-            bootstrap.PlayerAvatar = GameObject.Find(PlayerAvatarName);
-            bootstrap.MapAnchor = FindObjectOfType<GameOsmMapAnchor>();
-            bootstrap.GameplayCamera = Camera.main;
+            var game = CreateOrUpdateGameBootstrap();
+            var bootstrap = EnsureComponent<GameSceneBootstrap>(game);
+            var playerObject = GameObject.Find(PlayerAvatarName);
+            bootstrap.PlayerAvatar = playerObject != null ? playerObject.GetComponent<GameAvatarIntegration>() : null;
+            bootstrap.MapAnchor = GameObject.FindObjectOfType<GameOsmMapAnchor>();
+            bootstrap.MainCamera = Camera.main;
             bootstrap.DemoController = CreateOrUpdateDemoController(bootstrap);
 
             EditorSceneManager.MarkSceneDirty(scene);

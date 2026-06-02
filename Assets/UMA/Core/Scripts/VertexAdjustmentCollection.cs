@@ -79,15 +79,27 @@ namespace UMA
             List<Type> types = new List<Type>();
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                foreach (var type in assembly.GetTypes())
+                foreach (var type in GetLoadableTypes(assembly))
                 {
-                    if (type.IsSubclassOf(typeof(VertexAdjustment)))
+                    if (type != null && type.IsSubclassOf(typeof(VertexAdjustment)))
                     {
                         types.Add(type);
                     }
                 }
             }
             return types;
+        }
+
+        private static Type[] GetLoadableTypes(System.Reflection.Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (System.Reflection.ReflectionTypeLoadException e)
+            {
+                return e.Types;
+            }
         }
 
         public static VertexAdjustment CreateVertexAdjustment(Type type)

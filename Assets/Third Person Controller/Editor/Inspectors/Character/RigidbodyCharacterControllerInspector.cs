@@ -46,8 +46,12 @@ namespace Opsive.ThirdPersonController.Editor
             // Loop through and store all of the possible ability types.
             var allAbilityTypes = new List<Type>();
             for (int i = 0; i < assemblies.Length; ++i) {
-                var assemblyTypes = assemblies[i].GetTypes();
+                var assemblyTypes = GetLoadableTypes(assemblies[i]);
                 for (int j = 0; j < assemblyTypes.Length; ++j) {
+                    if (assemblyTypes[j] == null) {
+                        continue;
+                    }
+
                     // Must derive from Ability.
                     if (!typeof(Ability).IsAssignableFrom(assemblyTypes[j])) {
                         continue;
@@ -98,22 +102,15 @@ namespace Opsive.ThirdPersonController.Editor
             EditorGUI.BeginChangeCheck();
 
             // Ensure the correct multiplayer symbol is defined.
-#if !(UNITY_4_6 || UNITY_4_7 || UNITY_5_0)
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET && !(UNITY_4_6 || UNITY_4_7 || UNITY_5_0)
             var hasNetworkIdentity = (target as MonoBehaviour).GetComponent<UnityEngine.Networking.NetworkIdentity>() != null;
             var showNetworkToggle = false;
             var removeSymbol = false;
-#if ENABLE_MULTIPLAYER
             if (!hasNetworkIdentity) {
                 EditorGUILayout.HelpBox("ENABLE_MULTIPLAYER is defined but no NetworkIdentity can be found. This symbol needs to be removed.", MessageType.Error);
                 showNetworkToggle = true;
                 removeSymbol = true;
             }
-#else
-            if (hasNetworkIdentity) {
-                EditorGUILayout.HelpBox("A NetworkIdentity was found but ENABLE_MULTIPLAYER is not defined. This symbol needs to be defined.", MessageType.Error);
-                showNetworkToggle = true;
-            }
-#endif
             if (!EditorApplication.isCompiling && showNetworkToggle && GUILayout.Button((removeSymbol ? "Remove" : "Add") + " Multiplayer Symbol")) {
                 ToggleMultiplayerSymbol();
             }
@@ -448,6 +445,18 @@ namespace Opsive.ThirdPersonController.Editor
             }
             PlayerSettings.SetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup, symbols);
             AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Gets all loadable types from an assembly, ignoring legacy plugin references that are unavailable in this Unity version.
+        /// </summary>
+        private static Type[] GetLoadableTypes(Assembly assembly)
+        {
+            try {
+                return assembly.GetTypes();
+            } catch (ReflectionTypeLoadException e) {
+                return e.Types;
+            }
         }
 
         /// <summary>

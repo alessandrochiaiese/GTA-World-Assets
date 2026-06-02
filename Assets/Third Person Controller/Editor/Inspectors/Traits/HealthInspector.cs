@@ -55,15 +55,21 @@ namespace Opsive.ThirdPersonController.Editor
                 EditorGUI.indentLevel++;
                 if (m_DamageMultiplierList == null) {
                     var damageMultiplierProperty = PropertyFromName(serializedObject, "m_DamageMultipliers");
-                    m_DamageMultiplierList = new ReorderableList(serializedObject, damageMultiplierProperty, true, true, true, true);
-                    m_DamageMultiplierList.drawHeaderCallback = OnDamageMultiplierHeaderDraw;
-                    m_DamageMultiplierList.drawElementCallback = OnDamageMultiplierElementDraw;
+                    if (damageMultiplierProperty != null) {
+                        m_DamageMultiplierList = new ReorderableList(serializedObject, damageMultiplierProperty, true, true, true, true);
+                        m_DamageMultiplierList.drawHeaderCallback = OnDamageMultiplierHeaderDraw;
+                        m_DamageMultiplierList.drawElementCallback = OnDamageMultiplierElementDraw;
+                    }
                 }
-                // Indent the list so it lines up with the rest of the content.
-                var rect = GUILayoutUtility.GetRect(0, m_DamageMultiplierList.GetHeight());
-                rect.x += EditorGUI.indentLevel * 15;
-                rect.xMax -= EditorGUI.indentLevel * 15;
-                m_DamageMultiplierList.DoList(rect);
+                if (m_DamageMultiplierList != null) {
+                    // Indent the list so it lines up with the rest of the content.
+                    var rect = GUILayoutUtility.GetRect(0, m_DamageMultiplierList.GetHeight());
+                    rect.x += EditorGUI.indentLevel * 15;
+                    rect.xMax -= EditorGUI.indentLevel * 15;
+                    m_DamageMultiplierList.DoList(rect);
+                } else {
+                    EditorGUILayout.HelpBox("Damage multipliers are not available on this legacy runtime component.", MessageType.Info);
+                }
 
                 EditorGUI.indentLevel--;
             }

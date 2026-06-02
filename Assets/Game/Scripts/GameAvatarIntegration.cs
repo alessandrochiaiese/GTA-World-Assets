@@ -224,6 +224,27 @@ namespace GTAWorld.Game
             return transform.Find("UMA_Prototype_Visible_Body") != null;
         }
 
+        [ContextMenu("Remove Prototype Visual")]
+        public void RemovePrototypeVisual()
+        {
+            DestroyPrototypeChild("UMA_Prototype_Visible_Body");
+            DestroyPrototypeChild("UMA_Prototype_Visible_Head");
+        }
+
+        private void DestroyPrototypeChild(string childName)
+        {
+            var child = transform.Find(childName);
+            if (child == null) {
+                return;
+            }
+
+            if (Application.isPlaying) {
+                Destroy(child.gameObject);
+            } else {
+                DestroyImmediate(child.gameObject);
+            }
+        }
+
         private void SetPrototypeVisual(bool female)
         {
             EnsurePrototypeVisual();
@@ -231,7 +252,9 @@ namespace GTAWorld.Game
             var color = female ? new Color(0.9f, 0.45f, 0.8f) : new Color(0.35f, 0.55f, 1f);
             for (int i = 0; i < renderers.Length; i++) {
                 if (renderers[i] != null && renderers[i].name.StartsWith("UMA_Prototype_Visible_")) {
-                    renderers[i].material.color = color;
+                    if (renderers[i].sharedMaterial != null) {
+                        renderers[i].sharedMaterial.color = color;
+                    }
                 }
             }
         }

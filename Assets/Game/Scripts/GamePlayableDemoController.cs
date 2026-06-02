@@ -14,12 +14,18 @@ namespace GTAWorld.Game
         [SerializeField] private GameOsmMapAnchor m_MapAnchor;
         [SerializeField] private string[] m_DemoDnaNames = { "height", "headSize", "belly", "upperMuscle", "lowerMuscle" };
         [SerializeField] private bool m_ShowHelp = true;
+        [SerializeField] private GameObject[] m_WeaponPreviewPrefabs;
 
         private GameObject m_CurrentWeaponPreview;
         private string m_StatusMessage = "Ready";
         public GameAvatarIntegration Avatar { get { return m_Avatar; } set { m_Avatar = value; } }
         public GameWeaponMounts WeaponMounts { get { return m_WeaponMounts; } set { m_WeaponMounts = value; } }
         public GameOsmMapAnchor MapAnchor { get { return m_MapAnchor; } set { m_MapAnchor = value; } }
+
+        public void SetWeaponPreviewPrefabs(GameObject[] weaponPreviewPrefabs)
+        {
+            m_WeaponPreviewPrefabs = weaponPreviewPrefabs;
+        }
 
         private void Reset()
         {
@@ -40,7 +46,7 @@ namespace GTAWorld.Game
 
             GUILayout.BeginArea(new Rect(16f, 16f, 420f, 210f), "GTA World Demo", GUI.skin.window);
             GUILayout.Label("F1 Male | F2 Female | F3 Random DNA | 1-4 Preview weapons | H Hide");
-            GUILayout.Label("Move/play with the Opsive controller after tuning input and item types.");
+            GUILayout.Label("WASD moves the demo avatar; UMA must finish building before the mesh appears.");
             GUILayout.Label("Place generated OSM content under World_Map_Setup/OSM_Map_Root.");
             GUILayout.Label("Status: " + m_StatusMessage);
 
@@ -126,7 +132,7 @@ namespace GTAWorld.Game
             AutoBind();
             if (m_Avatar != null) {
                 m_Avatar.SetMale();
-                m_StatusMessage = "Male race/prototype applied";
+                m_StatusMessage = "Male UMA race requested";
             } else {
                 m_StatusMessage = "Avatar reference missing";
             }
@@ -137,7 +143,7 @@ namespace GTAWorld.Game
             AutoBind();
             if (m_Avatar != null) {
                 m_Avatar.SetFemale();
-                m_StatusMessage = "Female race/prototype applied";
+                m_StatusMessage = "Female UMA race requested";
             } else {
                 m_StatusMessage = "Avatar reference missing";
             }
@@ -157,7 +163,7 @@ namespace GTAWorld.Game
                 }
             }
             m_Avatar.ForceUmaUpdate(true, false, true);
-            m_StatusMessage = "Random DNA/prototype scale applied";
+            m_StatusMessage = "Random UMA DNA requested";
         }
 
         public void EquipPreviewWeapon(int weaponIndex)
@@ -168,43 +174,46 @@ namespace GTAWorld.Game
                 return;
             }
 
+            if (m_WeaponPreviewPrefabs == null || weaponIndex < 0 || weaponIndex >= m_WeaponPreviewPrefabs.Length || m_WeaponPreviewPrefabs[weaponIndex] == null) {
+                m_StatusMessage = "No real weapon prefab assigned for this slot yet";
+                return;
+            }
+
             if (m_CurrentWeaponPreview != null) {
                 Destroy(m_CurrentWeaponPreview);
             }
 
-            m_CurrentWeaponPreview = CreatePreviewWeapon(weaponIndex);
+            m_CurrentWeaponPreview = Instantiate(m_WeaponPreviewPrefabs[weaponIndex]);
+            m_CurrentWeaponPreview.name = m_WeaponPreviewPrefabs[weaponIndex].name + "_Preview";
+            PreparePreviewWeapon(m_CurrentWeaponPreview);
             var mount = weaponIndex == 3 ? GameWeaponMounts.WeaponMount.Back : GameWeaponMounts.WeaponMount.RightHand;
             m_WeaponMounts.AttachWeapon(m_CurrentWeaponPreview, mount, true);
             m_StatusMessage = m_CurrentWeaponPreview.name + " attached to " + mount;
         }
 
-        private GameObject CreatePreviewWeapon(int weaponIndex)
+        private static void PreparePreviewWeapon(GameObject weapon)
         {
-            GameObject weapon;
-            switch (weaponIndex) {
-                case 1:
-                    weapon = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    weapon.name = "Preview_Assault_Rifle";
-                    weapon.transform.localScale = new Vector3(0.12f, 0.12f, 0.9f);
-                    break;
-                case 2:
-                    weapon = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    weapon.name = "Preview_Melee_Weapon";
-                    weapon.transform.localScale = new Vector3(0.06f, 0.06f, 0.8f);
-                    break;
-                case 3:
-                    weapon = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                    weapon.name = "Preview_Back_Weapon";
-                    weapon.transform.localScale = new Vector3(0.12f, 0.45f, 0.12f);
-                    break;
-                default:
-                    weapon = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    weapon.name = "Preview_Pistol";
-                    weapon.transform.localScale = new Vector3(0.12f, 0.08f, 0.28f);
-                    break;
+            if (weapon == null) {
+                return;
             }
-            weapon.transform.localRotation = Quaternion.identity;
-            return weapon;
+
+            var behaviours = weapon.GetComponentsInChildren<MonoBehaviour>(true);
+            for (int i = 0; i < behaviours.Length; i++) {
+                if (behaviours[i] != null) {
+                    behaviours[i].enabled = false;
+                }
+            }
+
+            var colliders = weapon.GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++) {
+                colliders[i].enabled = false;
+            }
+
+            var rigidbodies = weapon.GetComponentsInChildren<Rigidbody>(true);
+            for (int i = 0; i < rigidbodies.Length; i++) {
+                rigidbodies[i].isKinematic = true;
+                rigidbodies[i].useGravity = false;
+            }
         }
     }
 }

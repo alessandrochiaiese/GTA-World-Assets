@@ -26,8 +26,9 @@ Dopo la compilazione trovi i menu in **Tools > Game**:
 5. Configura vestiti e DNA dal componente `GameAvatarIntegration` o chiamando i suoi metodi da UI/gameplay.
 6. Configura prefab armi usando i mount creati da `GameWeaponMounts`.
 7. Premi Play e usa il pannello demo: i bottoni cambiano sesso/race UMA, randomizzano alcuni DNA demo e mostrano armi preview sui mount; la riga Status conferma ogni click. Puoi anche usare F1/F2/F3/1-4/H quando la Game view ha il focus.
-8. Muovi il player con WASD/frecce e Shift per sprint usando il mover fallback compatibile con Input System. Se UMA non genera subito il mesh, viene mostrato un proxy visibile temporaneo per verificare bottoni, DNA e armi.
-9. I pickup armi e i placeholder cavallo/veicolo creati dal menu sono una base da rifinire con gli item type, animator e prefab definitivi di Opsive.
+8. Muovi il player con WASD/frecce e Shift per sprint usando il mover fallback compatibile con Input System. Il menu prova prima il prefab personaggio di UMA Settings e poi `Assets/UMA/Getting Started/UMADynamicCharacterAvatar.prefab`; se nessuno dei due esiste/importa correttamente, segnala che bisogna configurare un prefab UMA reale.
+9. I bottoni armi assegnano automaticamente alcuni prefab reali disponibili nel progetto al controller demo e li montano sulla mano/schiena disattivando script/collider da pickup. I pickup in scena e i placeholder cavallo/veicolo restano una base da rifinire con gli item type, animator e prefab definitivi di Opsive.
+10. Il menu assegna anche il controller animator demo `Third Person Shooter/Animator/Shooter.controller` all'avatar UMA quando l'asset e presente; per una integrazione Opsive completa servono comunque item set/abilities/IK configurati secondo il pacchetto Opsive installato.
 
 ## Nota networking
 

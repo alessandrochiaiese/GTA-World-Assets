@@ -36,7 +36,7 @@ namespace GTAWorld.Game
         [SerializeField] private List<DnaValue> m_StartupDna = new List<DnaValue>();
         [SerializeField] private List<WardrobeEntry> m_StartupWardrobe = new List<WardrobeEntry>();
         [SerializeField] private bool m_ApplyMaleRaceOnStart = true;
-        [SerializeField] private bool m_CreatePrototypeVisualWhenUmaIsEmpty = true;
+        [SerializeField] private bool m_CreatePrototypeVisualWhenUmaIsEmpty;
 
         [Header("Opsive")]
         [Tooltip("Animator used by the Third Person Controller. Auto-filled if empty.")]
@@ -69,6 +69,8 @@ namespace GTAWorld.Game
             }
             if (m_CreatePrototypeVisualWhenUmaIsEmpty) {
                 EnsurePrototypeVisual();
+            } else {
+                RemovePrototypeVisual();
             }
         }
 
@@ -103,13 +105,11 @@ namespace GTAWorld.Game
         public void SetMale()
         {
             ChangeRace(m_MaleRace);
-            SetPrototypeVisual(false);
         }
 
         public void SetFemale()
         {
             ChangeRace(m_FemaleRace);
-            SetPrototypeVisual(true);
         }
 
         public bool ChangeRace(string raceName, bool force = true)
@@ -167,15 +167,12 @@ namespace GTAWorld.Game
                 return;
             }
 
-            var prototypeScale = 1f;
             foreach (var dna in values) {
                 if (dna == null || string.IsNullOrEmpty(dna.Name)) {
                     continue;
                 }
                 SetDna(dna.Name, dna.Value, dna.RebuildImmediately);
-                prototypeScale += (Mathf.Clamp01(dna.Value) - 0.5f) * 0.04f;
             }
-            SetPrototypeScale(prototypeScale);
         }
 
         public bool SetDna(string dnaName, float value, bool rebuild = false)
@@ -183,10 +180,7 @@ namespace GTAWorld.Game
             if (string.IsNullOrEmpty(dnaName)) {
                 return false;
             }
-            var clampedValue = Mathf.Clamp01(value);
-            var changed = InvokeUma("SetDNA", new object[] { dnaName, clampedValue, rebuild });
-            SetPrototypeScale(0.8f + clampedValue * 0.4f);
-            return changed;
+            return InvokeUma("SetDNA", new object[] { dnaName, Mathf.Clamp01(value), rebuild });
         }
 
         public bool ForceUmaUpdate(bool dnaDirty = true, bool textureDirty = true, bool meshDirty = true)

@@ -14,6 +14,9 @@ namespace GTAWorld.Game.Editor
         private const string GameRoot = "Assets/Game";
         private const string PrefabRoot = GameRoot + "/Prefabs";
         private const string AvatarPrefabPath = PrefabRoot + "/UMA_Opsive_Avatar_Template.prefab";
+        private const string PlayerAvatarName = "Player_UMA_Opsive";
+        private const string DefaultUmaCharacterPrefabPath = "Assets/UMA/Getting Started/UMADynamicCharacterAvatar.prefab";
+        private const string OpsiveShooterAnimatorPath = "Assets/Third Person Controller/Demos/Third Person Shooter/Animator/Shooter.controller";
 
         private static readonly string[] OpsiveCharacterComponents = {
             "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController",
@@ -70,6 +73,13 @@ namespace GTAWorld.Game.Editor
             "Assets/Third Person Controller/Demos/Clean Scene/Prefabs/Bow Pickup.prefab"
         };
 
+        private static readonly string[] WeaponPreviewPrefabPaths = {
+            "Assets/UMA/Examples/MountingObjects Example/Assets/Pistol.prefab",
+            "Assets/Third Person Controller/Demos/Third Person Shooter/Prefabs/Items/Assault Rifle/Assault Rifle Pickup.prefab",
+            "Assets/UMA/Examples/MountingObjects Example/Assets/Sword.prefab",
+            "Assets/Third Person Controller/Demos/Clean Scene/Prefabs/Bow Pickup.prefab"
+        };
+
         [MenuItem("Tools/Game/Create Project Folders", false, 0)]
         public static void CreateProjectFolders()
         {
@@ -116,6 +126,7 @@ namespace GTAWorld.Game.Editor
         public static void CreateCompletePlayableScene()
         {
             EnsureProjectFolders();
+            CleanupGeneratedSceneObjects();
 
             var game = CreateOrUpdateGameBootstrap();
             var mapAnchor = CreateOrUpdateMapAnchor();
@@ -213,10 +224,51 @@ namespace GTAWorld.Game.Editor
             integration.Animator = avatar.GetComponentInChildren<Animator>();
             integration.WeaponMounts = mounts;
             integration.AutoBind();
-            integration.EnsurePrototypeVisual();
+            integration.RemovePrototypeVisual();
             integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
+        }
+
+        private static void CleanupGeneratedSceneObjects()
+        {
+            DestroySceneObjectsNamed(PlayerAvatarName);
+            DestroySceneObjectsNamed("UMA_Opsive_Avatar_Template");
+            DestroySceneObjectsNamed("Demo_Runtime_Controller");
+        }
+
+        private static void DestroySceneObjectsNamed(string objectName)
+        {
+            var objects = Resources.FindObjectsOfTypeAll<GameObject>();
+            for (int i = objects.Length - 1; i >= 0; i--) {
+                var obj = objects[i];
+                if (obj == null || EditorUtility.IsPersistent(obj)) {
+                    continue;
+                }
+                if (obj.name != objectName && !obj.name.StartsWith(objectName + " (")) {
+                    continue;
+                }
+                Undo.DestroyObjectImmediate(obj);
+            }
+        }
+
+        private static GameObject CreateUmaCharacterFromSettings()
+        {
+            var settings = UMASettings.GetOrCreateSettings();
+            var characterPrefab = settings != null ? settings.characterPrefab : null;
+            if (characterPrefab == null) {
+                characterPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(DefaultUmaCharacterPrefabPath);
+            }
+            if (characterPrefab == null) {
+                Debug.LogWarning("No UMA character prefab is configured. Set UMA Settings > Character Prefab or import/fetch the UMA Getting Started prefab so the one-click scene can create a visible UMA mesh.");
+                return null;
+            }
+
+            var avatar = PrefabUtility.InstantiatePrefab(characterPrefab) as GameObject;
+            if (avatar != null) {
+                Undo.RegisterCreatedObjectUndo(avatar, "Create UMA Character From Settings");
+            }
+            return avatar;
         }
 
         private static void CreateOrUpdateUmaRuntime()
@@ -257,12 +309,22 @@ namespace GTAWorld.Game.Editor
                 return;
             }
 
+            var animatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(OpsiveShooterAnimatorPath);
             var avatarBase = umaAvatar as UMAAvatarBase;
             if (avatarBase != null) {
                 avatarBase.context = UMAContextBase.Instance;
                 avatarBase.umaGenerator = GameObject.FindObjectOfType<UMAGeneratorBase>();
+                if (animatorController != null) {
+                    avatarBase.animationController = animatorController;
+                }
             }
 
+            var animator = avatar.GetComponentInChildren<Animator>();
+            if (animator != null && animatorController != null) {
+                animator.runtimeAnimatorController = animatorController;
+            }
+
+            SetBooleanProperty(umaAvatar, "BuildCharacterEnabled", true);
             InvokeUmaMethod(umaAvatar, "ChangeRace", new object[] { "HumanMale", true });
             InvokeUmaMethod(umaAvatar, "BuildCharacter", new object[] { true, true, true });
         }
@@ -293,10 +355,14 @@ namespace GTAWorld.Game.Editor
 
         private static GameObject CreateOrUpdatePlayerAvatar(GameOsmMapAnchor mapAnchor)
         {
-            var avatar = GameObject.Find("Player_UMA_Opsive");
+            var avatar = GameObject.Find(PlayerAvatarName);
             if (avatar == null) {
-                avatar = new GameObject("Player_UMA_Opsive");
-                Undo.RegisterCreatedObjectUndo(avatar, "Create Player UMA/Opsive Avatar");
+                avatar = CreateUmaCharacterFromSettings();
+                if (avatar == null) {
+                    avatar = new GameObject(PlayerAvatarName);
+                    Undo.RegisterCreatedObjectUndo(avatar, "Create Player UMA/Opsive Avatar");
+                }
+                avatar.name = PlayerAvatarName;
             }
 
             PrepareAvatarObject(avatar, true);
@@ -340,7 +406,17 @@ namespace GTAWorld.Game.Editor
             controller.Avatar = bootstrap.PlayerAvatar;
             controller.MapAnchor = bootstrap.MapAnchor;
             controller.WeaponMounts = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameWeaponMounts>() : null;
+            controller.SetWeaponPreviewPrefabs(LoadWeaponPreviewPrefabs());
             return controller;
+        }
+
+        private static GameObject[] LoadWeaponPreviewPrefabs()
+        {
+            var prefabs = new GameObject[WeaponPreviewPrefabPaths.Length];
+            for (int i = 0; i < WeaponPreviewPrefabPaths.Length; i++) {
+                prefabs[i] = AssetDatabase.LoadAssetAtPath<GameObject>(WeaponPreviewPrefabPaths[i]);
+            }
+            return prefabs;
         }
 
         private static Transform CreateWeaponPickupGallery(Transform parent)
@@ -585,6 +661,18 @@ namespace GTAWorld.Game.Editor
             }
 
             return Undo.AddComponent(target, type);
+        }
+
+        private static void SetBooleanProperty(Component component, string propertyName, bool value)
+        {
+            if (component == null) {
+                return;
+            }
+
+            var property = component.GetType().GetProperty(propertyName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            if (property != null && property.PropertyType == typeof(bool) && property.CanWrite) {
+                property.SetValue(component, value, null);
+            }
         }
 
         private static bool InvokeUmaMethod(Component component, string methodName, object[] arguments)

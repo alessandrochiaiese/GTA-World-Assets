@@ -20,7 +20,7 @@ namespace GTAWorld.Game
         [SerializeField] private Component m_ItemHandler;
         [SerializeField] private Animator m_Animator;
         [SerializeField] private UnityEngine.Object[] m_DefaultItemTypes;
-        [SerializeField] private bool m_LoadDefaultLoadoutOnStart = true;
+        [SerializeField] private bool m_LoadDefaultLoadoutOnStart;
         [SerializeField] private bool m_HandleDemoInput = true;
         [SerializeField] private bool m_LogBridgeEvents;
 

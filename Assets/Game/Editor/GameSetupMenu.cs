@@ -1,6 +1,10 @@
 using System;
+using System.IO;
+using System.Reflection;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UMA;
 using GTAWorld.Game;
 
@@ -17,10 +21,18 @@ namespace GTAWorld.Game.Editor
         private const string PlayerAvatarName = "Player_UMA_Opsive";
         private const string DefaultUmaCharacterPrefabPath = "Assets/UMA/Getting Started/UMADynamicCharacterAvatar.prefab";
         private const string OpsiveShooterAnimatorPath = "Assets/Third Person Controller/Demos/Third Person Shooter/Animator/Shooter.controller";
+        private const string OpsiveShooterScenePath = "Assets/Third Person Controller/Demos/Third Person Shooter/Third Person Shooter.unity";
+        private const string GameScenesRoot = GameRoot + "/Scenes";
+        private const string GeneratedOpsiveScenePath = GameScenesRoot + "/GTA_Opsive_UMA_Demo.unity";
 
         private static readonly string[] OpsiveCharacterComponents = {
             "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController",
             "Opsive.ThirdPersonController.Wrappers.CharacterIK"
+        };
+
+        private static readonly string[] OpsivePlayerCandidateComponents = {
+            "Opsive.ThirdPersonController.RigidbodyCharacterController",
+            "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController"
         };
 
         private static readonly string[] OpsiveInspectorMismatchComponents = {
@@ -156,7 +168,201 @@ namespace GTAWorld.Game.Editor
         [MenuItem("Tools/Game/ONE CLICK - Create Complete GTA Demo", false, -10)]
         public static void CreateCompleteGtaDemo()
         {
-            CreateCompletePlayableScene();
+            CreateOpsiveShooterUmaDemoScene();
+        }
+
+        [MenuItem("Tools/Game/Create/Opsive Shooter Scene + UMA Player", false, 9)]
+        public static void CreateOpsiveShooterUmaDemoScene()
+        {
+            EnsureProjectFolders();
+            EnsureFolder(GameRoot, "Scenes");
+            ConfigureKeyboardInputForOpsive();
+
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(OpsiveShooterScenePath) == null) {
+                Debug.LogWarning("Opsive Third Person Shooter scene not found. Falling back to the generated sandbox scene.");
+                CreateCompletePlayableScene();
+                return;
+            }
+
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) {
+                return;
+            }
+
+            if (File.Exists(GeneratedOpsiveScenePath)) {
+                AssetDatabase.DeleteAsset(GeneratedOpsiveScenePath);
+            }
+            if (!AssetDatabase.CopyAsset(OpsiveShooterScenePath, GeneratedOpsiveScenePath)) {
+                Debug.LogError("Unable to copy the Opsive shooter scene. Falling back to the generated sandbox scene.");
+                CreateCompletePlayableScene();
+                return;
+            }
+            AssetDatabase.ImportAsset(GeneratedOpsiveScenePath);
+
+            var scene = EditorSceneManager.OpenScene(GeneratedOpsiveScenePath, OpenSceneMode.Single);
+            CreateOrUpdateUmaRuntime();
+            var opsivePlayer = FindOpsivePlayerCandidate();
+            if (opsivePlayer == null) {
+                Debug.LogWarning("Copied the Opsive shooter scene but could not find its character controller. A UMA/Opsive player will be generated instead.");
+                var anchor = CreateOrUpdateOsmMapSetup();
+                var generatedPlayer = CreateOrUpdatePlayerAvatar(anchor);
+                CreateOrUpdateGameplayCamera(generatedPlayer != null ? generatedPlayer.transform : null);
+            } else {
+                ConvertOpsiveScenePlayerToUma(opsivePlayer);
+                var anchor = CreateOrUpdateOsmMapSetup();
+                if (anchor != null) {
+                    anchor.PlayerSpawnPoint = opsivePlayer.transform;
+                    CreatePlaceholderMapBlockout(anchor.transform);
+                }
+                CreateOrUpdateGameplayCamera(opsivePlayer.transform);
+            }
+
+            var bootstrap = CreateOrUpdateSceneBootstrap();
+            bootstrap.PlayerAvatar = GameObject.Find(PlayerAvatarName);
+            bootstrap.MapAnchor = FindObjectOfType<GameOsmMapAnchor>();
+            bootstrap.GameplayCamera = Camera.main;
+            bootstrap.DemoController = CreateOrUpdateDemoController(bootstrap);
+
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene);
+            Debug.Log("Copied the Opsive Third Person Shooter demo scene and replaced/prepared the player with UMA integration. Use this scene first for the real Opsive movement/weapon pipeline.");
+        }
+
+        private static void ConfigureKeyboardInputForOpsive()
+        {
+            InvokeStaticEditorMethod("Opsive.ThirdPersonController.Editor.Input.UnityInputInspector", "UpdateInputManager");
+            EnableBothUnityInputBackends();
+        }
+
+        private static void EnableBothUnityInputBackends()
+        {
+            var property = typeof(PlayerSettings).GetProperty("activeInputHandling", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property == null || !property.CanWrite) {
+                Debug.LogWarning("Could not change Unity Active Input Handling automatically. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both.");
+                return;
+            }
+
+            var value = property.GetValue(null, null);
+            if (value != null && value.ToString() == "Both") {
+                return;
+            }
+
+            object bothValue = null;
+            if (property.PropertyType.IsEnum) {
+                bothValue = Enum.Parse(property.PropertyType, "Both");
+            } else if (property.PropertyType == typeof(int)) {
+                bothValue = 2;
+            }
+            if (bothValue == null) {
+                Debug.LogWarning("Could not determine the Unity Active Input Handling enum value. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both.");
+                return;
+            }
+
+            property.SetValue(null, bothValue, null);
+            Debug.Log("Unity Active Input Handling set to Both for legacy Opsive keyboard/mouse input.");
+        }
+
+        private static void InvokeStaticEditorMethod(string typeName, string methodName)
+        {
+            var type = FindType(typeName);
+            var method = type != null ? type.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic) : null;
+            if (method == null) {
+                Debug.LogWarning("Could not find " + typeName + "." + methodName + "; Opsive InputManager axes may need to be updated manually from Tools > Third Person Controller > Start Window.");
+                return;
+            }
+            method.Invoke(null, null);
+            Debug.Log("Opsive InputManager keyboard/mouse axes updated.");
+        }
+
+        private static GameObject FindOpsivePlayerCandidate()
+        {
+            var objects = UnityEngine.Object.FindObjectsOfType<GameObject>();
+            for (int i = 0; i < objects.Length; ++i) {
+                if (HasAnyComponent(objects[i], OpsivePlayerCandidateComponents)) {
+                    return objects[i];
+                }
+            }
+            for (int i = 0; i < objects.Length; ++i) {
+                var objectName = objects[i].name.ToLowerInvariant();
+                if (objectName.Contains("nolan") || objectName.Contains("player") || objectName.Contains("character")) {
+                    return objects[i];
+                }
+            }
+            return null;
+        }
+
+        private static bool HasAnyComponent(GameObject target, string[] typeNames)
+        {
+            if (target == null || typeNames == null) {
+                return false;
+            }
+            for (int i = 0; i < typeNames.Length; ++i) {
+                var type = FindType(typeNames[i]);
+                if (type != null && target.GetComponent(type) != null) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void ConvertOpsiveScenePlayerToUma(GameObject opsivePlayer)
+        {
+            if (opsivePlayer == null) {
+                return;
+            }
+
+            opsivePlayer.name = PlayerAvatarName;
+
+            var umaVisual = opsivePlayer.transform.Find("UMA_Dynamic_Avatar_Visual");
+            GameObject umaObject = umaVisual != null ? umaVisual.gameObject : null;
+            if (umaObject == null) {
+                umaObject = CreateUmaCharacterFromSettings();
+                if (umaObject != null) {
+                    Undo.RegisterCreatedObjectUndo(umaObject, "Add UMA Visual To Opsive Scene Player");
+                    umaObject.name = "UMA_Dynamic_Avatar_Visual";
+                    umaObject.transform.SetParent(opsivePlayer.transform, false);
+                }
+            }
+
+            if (umaObject != null) {
+                umaObject.transform.localPosition = Vector3.zero;
+                umaObject.transform.localRotation = Quaternion.identity;
+                umaObject.transform.localScale = Vector3.one;
+                ConfigureUmaAvatar(umaObject);
+            }
+
+            HideOriginalCharacterRenderers(opsivePlayer.transform, umaObject != null ? umaObject.transform : null);
+
+            var animator = umaObject != null ? umaObject.GetComponentInChildren<Animator>() : opsivePlayer.GetComponentInChildren<Animator>();
+            var mounts = EnsureComponent<GameWeaponMounts>(opsivePlayer);
+            mounts.Animator = animator;
+            mounts.AutoCreateMounts();
+
+            var integration = EnsureComponent<GameAvatarIntegration>(opsivePlayer);
+            integration.Animator = animator;
+            integration.WeaponMounts = mounts;
+            integration.AutoBind();
+            integration.SetMale();
+
+            EnsureComponent<GameProceduralLocomotionAnimator>(opsivePlayer);
+            EnsureComponent<GameFallbackWeaponController>(opsivePlayer).SetWeaponPrefabs(LoadWeaponPreviewPrefabs());
+            EnsureComponent<GameOpsiveRuntimeBridge>(opsivePlayer).SetDefaultItemTypes(BuildGeneratedOpsiveLoadout(opsivePlayer));
+        }
+
+        private static void HideOriginalCharacterRenderers(Transform root, Transform exceptRoot)
+        {
+            if (root == null) {
+                return;
+            }
+            var renderers = root.GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; ++i) {
+                if (renderers[i] == null) {
+                    continue;
+                }
+                if (exceptRoot != null && renderers[i].transform.IsChildOf(exceptRoot)) {
+                    continue;
+                }
+                renderers[i].enabled = false;
+            }
         }
 
         [MenuItem("Tools/Game/Create Complete Playable Scene", false, 10)]
@@ -265,6 +471,7 @@ namespace GTAWorld.Game.Editor
             integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
+            EnsureComponent<GameProceduralLocomotionAnimator>(avatar);
             ConfigureFullOpsiveSystem(avatar);
         }
 
@@ -574,6 +781,8 @@ namespace GTAWorld.Game.Editor
             var assetPath = GameRoot + "/OpsiveGenerated/ItemTypes/" + itemName + ".asset";
             var existing = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
             if (existing != null) {
+                AssignStableItemTypeId(existing, itemName);
+                EditorUtility.SetDirty(existing);
                 return existing;
             }
 
@@ -582,8 +791,44 @@ namespace GTAWorld.Game.Editor
                 return null;
             }
             instance.name = itemName;
+            AssignStableItemTypeId(instance, itemName);
             AssetDatabase.CreateAsset(instance, assetPath);
             return instance;
+        }
+
+        private static void AssignStableItemTypeId(UnityEngine.Object itemType, string itemName)
+        {
+            if (itemType == null) {
+                return;
+            }
+
+            var stableId = StablePositiveHash("GTAWorld_" + itemName);
+            var idProperty = itemType.GetType().GetProperty("ID", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (idProperty != null && idProperty.CanWrite && idProperty.PropertyType == typeof(int)) {
+                idProperty.SetValue(itemType, stableId, null);
+                return;
+            }
+            var idField = itemType.GetType().GetField("m_ID", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (idField != null && idField.FieldType == typeof(int)) {
+                idField.SetValue(itemType, stableId);
+            }
+        }
+
+        private static int StablePositiveHash(string value)
+        {
+            unchecked {
+                var hash = 23;
+                if (!string.IsNullOrEmpty(value)) {
+                    for (var i = 0; i < value.Length; ++i) {
+                        hash = (hash * 31) + value[i];
+                    }
+                }
+                if (hash == int.MinValue) {
+                    return 1;
+                }
+                hash = Mathf.Abs(hash);
+                return hash == 0 ? 1 : hash;
+            }
         }
 
         private static void BuildGeneratedOpsiveItem(Type itemBuilderType, Type itemTypeType, Transform loadoutRoot, string prefabPath, UnityEngine.Object itemType, string itemName, string builderItemType)
@@ -749,12 +994,15 @@ namespace GTAWorld.Game.Editor
                 return;
             }
 
-            var shader = Shader.Find("Standard");
+            var shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null) {
-                shader = Shader.Find("Universal Render Pipeline/Lit");
+                shader = Shader.Find("Unlit/Color");
             }
             if (shader == null) {
-                shader = Shader.Find("Diffuse");
+                shader = Shader.Find("Sprites/Default");
+            }
+            if (shader == null) {
+                shader = Shader.Find("Standard");
             }
             if (shader == null) {
                 if (renderer.sharedMaterial != null) {
@@ -764,6 +1012,12 @@ namespace GTAWorld.Game.Editor
             }
 
             var material = new Material(shader);
+            if (material.HasProperty("_BaseColor")) {
+                material.SetColor("_BaseColor", color);
+            }
+            if (material.HasProperty("_Color")) {
+                material.SetColor("_Color", color);
+            }
             material.color = color;
             renderer.sharedMaterial = material;
         }

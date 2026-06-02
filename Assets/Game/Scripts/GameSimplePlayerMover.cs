@@ -21,6 +21,7 @@ namespace GTAWorld.Game
         [SerializeField] private float m_AnimatorDampTime = 0.08f;
 
         private CharacterController m_CharacterController;
+        private RuntimeAnimatorController m_CachedAnimatorController;
         private bool m_HasHorizontalInput;
         private bool m_HasForwardInput;
         private bool m_HasYaw;
@@ -31,9 +32,7 @@ namespace GTAWorld.Game
             if (m_Camera == null) {
                 m_Camera = Camera.main;
             }
-            if (m_Animator == null) {
-                m_Animator = GetComponentInChildren<Animator>();
-            }
+            EnsureAnimator();
             CacheAnimatorParameters();
         }
 
@@ -44,6 +43,7 @@ namespace GTAWorld.Game
 
         private void Update()
         {
+            EnsureAnimator();
             var movement = ReadMovement();
             UpdateAnimator(movement);
             if (movement.sqrMagnitude < 0.001f) {
@@ -121,11 +121,28 @@ namespace GTAWorld.Game
             return (forward * movement.y + right * movement.x).normalized;
         }
 
+        private void EnsureAnimator()
+        {
+            if (m_Animator == null) {
+                m_Animator = GetComponentInChildren<Animator>();
+                m_CachedAnimatorController = null;
+            }
+            if (m_Animator == null) {
+                return;
+            }
+            m_Animator.applyRootMotion = false;
+            m_Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            if (m_CachedAnimatorController != m_Animator.runtimeAnimatorController) {
+                CacheAnimatorParameters();
+            }
+        }
+
         private void CacheAnimatorParameters()
         {
             if (m_Animator == null) {
                 m_Animator = GetComponentInChildren<Animator>();
             }
+            m_CachedAnimatorController = m_Animator != null ? m_Animator.runtimeAnimatorController : null;
             m_HasHorizontalInput = HasAnimatorParameter("Horizontal Input", AnimatorControllerParameterType.Float);
             m_HasForwardInput = HasAnimatorParameter("Forward Input", AnimatorControllerParameterType.Float);
             m_HasYaw = HasAnimatorParameter("Yaw", AnimatorControllerParameterType.Float);
@@ -149,7 +166,7 @@ namespace GTAWorld.Game
         private void UpdateAnimator(Vector2 movement)
         {
             if (m_Animator == null || m_Animator.runtimeAnimatorController == null) {
-                CacheAnimatorParameters();
+                EnsureAnimator();
             }
             if (m_Animator == null || m_Animator.runtimeAnimatorController == null) {
                 return;

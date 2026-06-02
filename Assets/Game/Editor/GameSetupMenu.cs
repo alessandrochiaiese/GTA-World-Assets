@@ -20,7 +20,6 @@ namespace GTAWorld.Game.Editor
 
         private static readonly string[] OpsiveCharacterComponents = {
             "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController",
-            "Opsive.ThirdPersonController.Wrappers.AnimatorMonitor",
             "Opsive.ThirdPersonController.Wrappers.CharacterIK"
         };
 
@@ -34,7 +33,9 @@ namespace GTAWorld.Game.Editor
             "Opsive.ThirdPersonController.Inventory",
             "Opsive.ThirdPersonController.Wrappers.Inventory",
             "Opsive.ThirdPersonController.Input.UnityInput",
-            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput"
+            "Opsive.ThirdPersonController.Input.Wrappers.UnityInput",
+            "Opsive.ThirdPersonController.AnimatorMonitor",
+            "Opsive.ThirdPersonController.Wrappers.AnimatorMonitor"
         };
 
         private static readonly string[] OpsiveAvatarAbilities = {
@@ -357,8 +358,12 @@ namespace GTAWorld.Game.Editor
             }
 
             var animator = avatar.GetComponentInChildren<Animator>();
-            if (animator != null && animatorController != null) {
-                animator.runtimeAnimatorController = animatorController;
+            if (animator != null) {
+                if (animatorController != null) {
+                    animator.runtimeAnimatorController = animatorController;
+                }
+                animator.applyRootMotion = false;
+                animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
             }
 
             SetBooleanProperty(umaAvatar, "BuildCharacterEnabled", true);
@@ -444,6 +449,7 @@ namespace GTAWorld.Game.Editor
             controller.MapAnchor = bootstrap.MapAnchor;
             controller.WeaponMounts = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameWeaponMounts>() : null;
             controller.OpsiveRuntimeBridge = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameOpsiveRuntimeBridge>() : null;
+            controller.FallbackWeaponController = bootstrap.PlayerAvatar != null ? bootstrap.PlayerAvatar.GetComponent<GameFallbackWeaponController>() : null;
             controller.SetWeaponPreviewPrefabs(LoadWeaponPreviewPrefabs());
             return controller;
         }
@@ -494,6 +500,8 @@ namespace GTAWorld.Game.Editor
             var itemTypes = BuildGeneratedOpsiveLoadout(avatar);
             var runtimeBridge = EnsureComponent<GameOpsiveRuntimeBridge>(avatar);
             runtimeBridge.SetDefaultItemTypes(itemTypes);
+            var fallbackWeapons = EnsureComponent<GameFallbackWeaponController>(avatar);
+            fallbackWeapons.SetWeaponPrefabs(LoadWeaponPreviewPrefabs());
         }
 
         private static void EnsureOpsiveItemPlacements(GameObject avatar)

@@ -13,6 +13,7 @@ namespace GTAWorld.Game
         [SerializeField] private GameWeaponMounts m_WeaponMounts;
         [SerializeField] private GameOsmMapAnchor m_MapAnchor;
         [SerializeField] private GameOpsiveRuntimeBridge m_OpsiveRuntimeBridge;
+        [SerializeField] private GameFallbackWeaponController m_FallbackWeaponController;
         [SerializeField] private string[] m_DemoDnaNames = { "height", "headSize", "belly", "upperMuscle", "lowerMuscle" };
         [SerializeField] private bool m_ShowHelp = true;
         [SerializeField] private GameObject[] m_WeaponPreviewPrefabs;
@@ -23,6 +24,7 @@ namespace GTAWorld.Game
         public GameWeaponMounts WeaponMounts { get { return m_WeaponMounts; } set { m_WeaponMounts = value; } }
         public GameOsmMapAnchor MapAnchor { get { return m_MapAnchor; } set { m_MapAnchor = value; } }
         public GameOpsiveRuntimeBridge OpsiveRuntimeBridge { get { return m_OpsiveRuntimeBridge; } set { m_OpsiveRuntimeBridge = value; } }
+        public GameFallbackWeaponController FallbackWeaponController { get { return m_FallbackWeaponController; } set { m_FallbackWeaponController = value; } }
 
         public void SetWeaponPreviewPrefabs(GameObject[] weaponPreviewPrefabs)
         {
@@ -53,6 +55,9 @@ namespace GTAWorld.Game
             GUILayout.Label("Status: " + m_StatusMessage);
             if (m_OpsiveRuntimeBridge != null) {
                 GUILayout.Label("Opsive: " + m_OpsiveRuntimeBridge.StatusMessage);
+            }
+            if (m_FallbackWeaponController != null) {
+                GUILayout.Label("Weapon: " + m_FallbackWeaponController.StatusMessage);
             }
 
             GUILayout.BeginHorizontal();
@@ -133,6 +138,9 @@ namespace GTAWorld.Game
             if (m_OpsiveRuntimeBridge == null && m_Avatar != null) {
                 m_OpsiveRuntimeBridge = m_Avatar.GetComponent<GameOpsiveRuntimeBridge>();
             }
+            if (m_FallbackWeaponController == null && m_Avatar != null) {
+                m_FallbackWeaponController = m_Avatar.GetComponent<GameFallbackWeaponController>();
+            }
         }
 
         public void SetMale()
@@ -179,6 +187,11 @@ namespace GTAWorld.Game
             AutoBind();
             if (m_OpsiveRuntimeBridge != null) {
                 m_OpsiveRuntimeBridge.EquipSlot(weaponIndex);
+            }
+            if (m_FallbackWeaponController != null) {
+                m_FallbackWeaponController.EquipWeapon(weaponIndex);
+                m_StatusMessage = "Playable weapon slot " + (weaponIndex + 1) + " equipped";
+                return;
             }
             if (m_WeaponMounts == null) {
                 m_StatusMessage = "Weapon mounts missing";

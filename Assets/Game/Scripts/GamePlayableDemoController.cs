@@ -16,6 +16,7 @@ namespace GTAWorld.Game
         [SerializeField] private bool m_ShowHelp = true;
 
         private GameObject m_CurrentWeaponPreview;
+        private string m_StatusMessage = "Ready";
         public GameAvatarIntegration Avatar { get { return m_Avatar; } set { m_Avatar = value; } }
         public GameWeaponMounts WeaponMounts { get { return m_WeaponMounts; } set { m_WeaponMounts = value; } }
         public GameOsmMapAnchor MapAnchor { get { return m_MapAnchor; } set { m_MapAnchor = value; } }
@@ -41,6 +42,7 @@ namespace GTAWorld.Game
             GUILayout.Label("F1 Male | F2 Female | F3 Random DNA | 1-4 Preview weapons | H Hide");
             GUILayout.Label("Move/play with the Opsive controller after tuning input and item types.");
             GUILayout.Label("Place generated OSM content under World_Map_Setup/OSM_Map_Root.");
+            GUILayout.Label("Status: " + m_StatusMessage);
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Male")) {
@@ -124,6 +126,9 @@ namespace GTAWorld.Game
             AutoBind();
             if (m_Avatar != null) {
                 m_Avatar.SetMale();
+                m_StatusMessage = "Male race/prototype applied";
+            } else {
+                m_StatusMessage = "Avatar reference missing";
             }
         }
 
@@ -132,6 +137,9 @@ namespace GTAWorld.Game
             AutoBind();
             if (m_Avatar != null) {
                 m_Avatar.SetFemale();
+                m_StatusMessage = "Female race/prototype applied";
+            } else {
+                m_StatusMessage = "Avatar reference missing";
             }
         }
 
@@ -139,6 +147,7 @@ namespace GTAWorld.Game
         {
             AutoBind();
             if (m_Avatar == null || m_DemoDnaNames == null) {
+                m_StatusMessage = "Avatar/DNA reference missing";
                 return;
             }
 
@@ -148,12 +157,14 @@ namespace GTAWorld.Game
                 }
             }
             m_Avatar.ForceUmaUpdate(true, false, true);
+            m_StatusMessage = "Random DNA/prototype scale applied";
         }
 
         public void EquipPreviewWeapon(int weaponIndex)
         {
             AutoBind();
             if (m_WeaponMounts == null) {
+                m_StatusMessage = "Weapon mounts missing";
                 return;
             }
 
@@ -164,6 +175,7 @@ namespace GTAWorld.Game
             m_CurrentWeaponPreview = CreatePreviewWeapon(weaponIndex);
             var mount = weaponIndex == 3 ? GameWeaponMounts.WeaponMount.Back : GameWeaponMounts.WeaponMount.RightHand;
             m_WeaponMounts.AttachWeapon(m_CurrentWeaponPreview, mount, true);
+            m_StatusMessage = m_CurrentWeaponPreview.name + " attached to " + mount;
         }
 
         private GameObject CreatePreviewWeapon(int weaponIndex)

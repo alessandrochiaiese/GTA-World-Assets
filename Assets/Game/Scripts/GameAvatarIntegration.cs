@@ -237,7 +237,7 @@ namespace GTAWorld.Game
             var color = female ? new Color(0.9f, 0.45f, 0.8f) : new Color(0.35f, 0.55f, 1f);
             for (int i = 0; i < renderers.Length; i++) {
                 if (renderers[i] != null && renderers[i].name.StartsWith("UMA_Prototype_Visible_")) {
-                    renderers[i].sharedMaterial.color = color;
+                    renderers[i].material.color = color;
                 }
             }
         }

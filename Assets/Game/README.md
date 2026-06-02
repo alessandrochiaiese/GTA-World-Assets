@@ -20,12 +20,12 @@ Dopo la compilazione trovi i menu in **Tools > Game**:
 ## Workflow consigliato
 
 1. Per partire subito, esegui **Tools > Game > Create Complete Playable Scene**.
-2. Importa/genera la mappa OSM e mettila sotto `World_Map_Setup/OSM_Map_Root`.
+2. Importa/genera la mappa OSM e mettila sotto `World_Map_Setup/OSM_Map_Root`; finche non importi dati reali, il menu crea una mini-citta placeholder visibile per testare movimento/camera.
 3. Se hai già un UMA Dynamic Character Avatar, selezionalo ed esegui **Tools > Game > Prepare Selected UMA Avatar For Opsive**.
 4. Usa il Character Builder di Opsive solo in modalità locale/non-networked per ora.
 5. Configura vestiti e DNA dal componente `GameAvatarIntegration` o chiamando i suoi metodi da UI/gameplay.
 6. Configura prefab armi usando i mount creati da `GameWeaponMounts`.
-7. Premi Play e usa il pannello demo: i bottoni cambiano sesso/race UMA, randomizzano alcuni DNA demo e mostrano armi preview sui mount. Puoi anche usare F1/F2/F3/1-4/H quando la Game view ha il focus.
+7. Premi Play e usa il pannello demo: i bottoni cambiano sesso/race UMA, randomizzano alcuni DNA demo e mostrano armi preview sui mount; la riga Status conferma ogni click. Puoi anche usare F1/F2/F3/1-4/H quando la Game view ha il focus.
 8. Muovi il player con WASD/frecce e Shift per sprint usando il mover fallback compatibile con Input System. Se UMA non genera subito il mesh, viene mostrato un proxy visibile temporaneo per verificare bottoni, DNA e armi.
 9. I pickup armi e i placeholder cavallo/veicolo creati dal menu sono una base da rifinire con gli item type, animator e prefab definitivi di Opsive.
 

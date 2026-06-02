@@ -1,6 +1,7 @@
 using System;
 using UnityEditor;
 using UnityEngine;
+using UMA;
 using GTAWorld.Game;
 
 namespace GTAWorld.Game.Editor
@@ -118,10 +119,12 @@ namespace GTAWorld.Game.Editor
 
             var game = CreateOrUpdateGameBootstrap();
             var mapAnchor = CreateOrUpdateMapAnchor();
+            CreateOrUpdateUmaRuntime();
             var avatar = CreateOrUpdatePlayerAvatar(mapAnchor);
             var camera = CreateOrUpdateGameplayCamera(avatar.transform);
             var weaponRoot = CreateWeaponPickupGallery(mapAnchor.transform);
             var rideableRoot = CreateRideableGallery(mapAnchor.transform);
+            CreateOsmPlaceholderCity(mapAnchor.MapRoot);
             CreateLightingAndGround(mapAnchor.transform);
 
             var bootstrap = EnsureComponent<GameSceneBootstrap>(game);
@@ -143,7 +146,9 @@ namespace GTAWorld.Game.Editor
             EnsureProjectFolders();
 
             var game = CreateOrUpdateGameBootstrap();
-            CreateOrUpdateMapAnchor();
+            var mapAnchor = CreateOrUpdateMapAnchor();
+            CreateOrUpdateUmaRuntime();
+            CreateOsmPlaceholderCity(mapAnchor.MapRoot);
 
             Selection.activeGameObject = game;
             Debug.Log("Created/updated scene bootstrap objects for Opsive managers and OSM map anchoring.", game);
@@ -178,6 +183,7 @@ namespace GTAWorld.Game.Editor
 
         private static void PrepareAvatarObject(GameObject avatar, bool addUmaComponent)
         {
+            CreateOrUpdateUmaRuntime();
             EnsureComponent<Animator>(avatar);
 
             var rigidbody = EnsureComponent<Rigidbody>(avatar);
@@ -193,6 +199,7 @@ namespace GTAWorld.Game.Editor
             if (addUmaComponent) {
                 AddComponentByName(avatar, "UMA.CharacterSystem.DynamicCharacterAvatar", false);
             }
+            ConfigureUmaAvatar(avatar);
 
             RemoveComponentsByName(avatar, OpsiveInspectorMismatchComponents);
             AddComponentsByName(avatar, OpsiveCharacterComponents);
@@ -210,6 +217,54 @@ namespace GTAWorld.Game.Editor
             integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
+        }
+
+        private static void CreateOrUpdateUmaRuntime()
+        {
+            var context = GameObject.FindObjectOfType<UMAGlobalContext>();
+            if (context == null) {
+                var contextObject = new GameObject("UMA_Runtime_Context");
+                Undo.RegisterCreatedObjectUndo(contextObject, "Create UMA Runtime Context");
+                context = contextObject.AddComponent<UMAGlobalContext>();
+            }
+
+            var generator = GameObject.FindObjectOfType<UMAGeneratorBase>();
+            if (generator == null) {
+                var settings = UMASettings.GetOrCreateSettings();
+                GameObject generatorObject = null;
+                if (settings != null && settings.generatorPrefab != null) {
+                    generatorObject = PrefabUtility.InstantiatePrefab(settings.generatorPrefab) as GameObject;
+                    if (generatorObject != null) {
+                        Undo.RegisterCreatedObjectUndo(generatorObject, "Create UMA Generator");
+                    }
+                }
+                if (generatorObject == null) {
+                    generatorObject = new GameObject("UMAGenerator");
+                    Undo.RegisterCreatedObjectUndo(generatorObject, "Create UMA Generator");
+                    generatorObject.AddComponent<UMAGenerator>();
+                }
+                generatorObject.name = "UMAGenerator";
+            }
+
+            UMAContextBase.Instance = context;
+            context.ValidateDictionaries();
+        }
+
+        private static void ConfigureUmaAvatar(GameObject avatar)
+        {
+            var umaAvatar = avatar.GetComponent("DynamicCharacterAvatar") as Component;
+            if (umaAvatar == null) {
+                return;
+            }
+
+            var avatarBase = umaAvatar as UMAAvatarBase;
+            if (avatarBase != null) {
+                avatarBase.context = UMAContextBase.Instance;
+                avatarBase.umaGenerator = GameObject.FindObjectOfType<UMAGeneratorBase>();
+            }
+
+            InvokeUmaMethod(umaAvatar, "ChangeRace", new object[] { "HumanMale", true });
+            InvokeUmaMethod(umaAvatar, "BuildCharacter", new object[] { true, true, true });
         }
 
         private static GameObject CreateOrUpdateGameBootstrap()
@@ -312,6 +367,62 @@ namespace GTAWorld.Game.Editor
                 pickup.transform.localPosition = new Vector3((i % 5) * 2.25f - 4.5f, 0.15f, 4f + (i / 5) * 2.25f);
             }
             return root;
+        }
+
+        private static void CreateOsmPlaceholderCity(Transform mapRoot)
+        {
+            if (mapRoot == null || mapRoot.Find("OSM_Visible_Test_City") != null) {
+                return;
+            }
+
+            var cityRoot = new GameObject("OSM_Visible_Test_City").transform;
+            Undo.RegisterCreatedObjectUndo(cityRoot.gameObject, "Create OSM Placeholder City");
+            cityRoot.SetParent(mapRoot, false);
+
+            for (int i = -2; i <= 2; i++) {
+                CreateRoad(cityRoot, "Road_NS_" + i, new Vector3(i * 6f, 0.02f, 0f), new Vector3(0.35f, 0.02f, 15f));
+                CreateRoad(cityRoot, "Road_EW_" + i, new Vector3(0f, 0.025f, i * 6f), new Vector3(15f, 0.02f, 0.35f));
+            }
+
+            var buildingIndex = 0;
+            for (int x = -2; x <= 2; x++) {
+                for (int z = -2; z <= 2; z++) {
+                    if ((x + z) % 2 == 0) {
+                        CreateBuilding(cityRoot, "OSM_Building_" + buildingIndex, new Vector3(x * 6f + 2.2f, 0.75f, z * 6f + 2.2f), 1.5f + ((x + 2 + z + 2) % 4) * 0.45f);
+                        buildingIndex++;
+                    }
+                }
+            }
+        }
+
+        private static void CreateRoad(Transform parent, string name, Vector3 localPosition, Vector3 localScale)
+        {
+            var road = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Undo.RegisterCreatedObjectUndo(road, "Create OSM Road");
+            road.name = name;
+            road.transform.SetParent(parent, false);
+            road.transform.localPosition = localPosition;
+            road.transform.localScale = localScale;
+            SetRendererColor(road, new Color(0.08f, 0.08f, 0.08f));
+        }
+
+        private static void CreateBuilding(Transform parent, string name, Vector3 localPosition, float height)
+        {
+            var building = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Undo.RegisterCreatedObjectUndo(building, "Create OSM Building");
+            building.name = name;
+            building.transform.SetParent(parent, false);
+            building.transform.localPosition = new Vector3(localPosition.x, height * 0.5f, localPosition.z);
+            building.transform.localScale = new Vector3(2f, height, 2f);
+            SetRendererColor(building, new Color(0.55f, 0.58f, 0.62f));
+        }
+
+        private static void SetRendererColor(GameObject target, Color color)
+        {
+            var renderer = target.GetComponent<Renderer>();
+            if (renderer != null) {
+                renderer.sharedMaterial.color = color;
+            }
         }
 
         private static Transform CreateRideableGallery(Transform parent)
@@ -474,6 +585,27 @@ namespace GTAWorld.Game.Editor
             }
 
             return Undo.AddComponent(target, type);
+        }
+
+        private static bool InvokeUmaMethod(Component component, string methodName, object[] arguments)
+        {
+            if (component == null) {
+                return false;
+            }
+
+            var methods = component.GetType().GetMethods(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+            for (int i = 0; i < methods.Length; i++) {
+                if (methods[i].Name != methodName) {
+                    continue;
+                }
+                var parameters = methods[i].GetParameters();
+                if (parameters.Length != arguments.Length) {
+                    continue;
+                }
+                methods[i].Invoke(component, arguments);
+                return true;
+            }
+            return false;
         }
 
         private static Type FindType(string typeName)

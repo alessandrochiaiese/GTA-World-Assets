@@ -116,7 +116,7 @@ namespace GTAWorld.Game
             }
 
             m_CurrentWeaponIndex = weaponIndex;
-            m_CurrentWeapon = Instantiate(m_WeaponPrefabs[weaponIndex]);
+            m_CurrentWeapon = CreateVisualWeaponClone(m_WeaponPrefabs[weaponIndex]);
             m_CurrentWeapon.name = m_WeaponPrefabs[weaponIndex].name + "_Playable";
             PrepareHeldWeapon(m_CurrentWeapon);
             var mount = weaponIndex == 3 ? GameWeaponMounts.WeaponMount.Back : GameWeaponMounts.WeaponMount.RightHand;
@@ -190,6 +190,57 @@ namespace GTAWorld.Game
             line.endColor = new Color(1f, 0.4f, 0f, 0f);
             yield return new WaitForSeconds(0.06f);
             Destroy(tracerObject);
+        }
+
+        private static GameObject CreateVisualWeaponClone(GameObject source)
+        {
+            if (source == null) {
+                return GameObject.CreatePrimitive(PrimitiveType.Cube);
+            }
+
+            var clone = new GameObject(source.name + "_VisualOnly");
+            CopyVisualChildren(source.transform, clone.transform);
+            if (clone.GetComponentsInChildren<Renderer>(true).Length == 0) {
+                var fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                fallback.name = "Fallback_Weapon_Mesh";
+                fallback.transform.SetParent(clone.transform, false);
+                fallback.transform.localScale = new Vector3(0.12f, 0.08f, 0.75f);
+            }
+            return clone;
+        }
+
+        private static void CopyVisualChildren(Transform source, Transform target)
+        {
+            CopyVisualComponents(source, target.gameObject);
+            for (int i = 0; i < source.childCount; ++i) {
+                var sourceChild = source.GetChild(i);
+                var targetChild = new GameObject(sourceChild.name);
+                targetChild.transform.SetParent(target, false);
+                targetChild.transform.localPosition = sourceChild.localPosition;
+                targetChild.transform.localRotation = sourceChild.localRotation;
+                targetChild.transform.localScale = sourceChild.localScale;
+                CopyVisualChildren(sourceChild, targetChild.transform);
+            }
+        }
+
+        private static void CopyVisualComponents(Transform source, GameObject target)
+        {
+            var meshFilter = source.GetComponent<MeshFilter>();
+            var meshRenderer = source.GetComponent<MeshRenderer>();
+            if (meshFilter != null && meshRenderer != null) {
+                var targetFilter = target.AddComponent<MeshFilter>();
+                targetFilter.sharedMesh = meshFilter.sharedMesh;
+                var targetRenderer = target.AddComponent<MeshRenderer>();
+                targetRenderer.sharedMaterials = meshRenderer.sharedMaterials;
+            }
+
+            var skinnedRenderer = source.GetComponent<SkinnedMeshRenderer>();
+            if (skinnedRenderer != null) {
+                var targetRenderer = target.AddComponent<SkinnedMeshRenderer>();
+                targetRenderer.sharedMesh = skinnedRenderer.sharedMesh;
+                targetRenderer.sharedMaterials = skinnedRenderer.sharedMaterials;
+                targetRenderer.localBounds = skinnedRenderer.localBounds;
+            }
         }
 
         private void PrepareHeldWeapon(GameObject weapon)

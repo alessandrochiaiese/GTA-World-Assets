@@ -232,14 +232,17 @@ namespace GTAWorld.Game.Editor
         private static void ConfigureKeyboardInputForOpsive()
         {
             InvokeStaticEditorMethod("Opsive.ThirdPersonController.Editor.Input.UnityInputInspector", "UpdateInputManager");
+            EnsureRequiredOpsiveKeyboardAxes();
             EnableBothUnityInputBackends();
+            AssetDatabase.SaveAssets();
         }
 
         private static void EnableBothUnityInputBackends()
         {
             var property = typeof(PlayerSettings).GetProperty("activeInputHandling", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             if (property == null || !property.CanWrite) {
-                Debug.LogWarning("Could not change Unity Active Input Handling automatically. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both.");
+                SetSerializedActiveInputHandlingBoth();
+                Debug.LogWarning("Could not change Unity Active Input Handling through PlayerSettings API; serialized project setting was updated instead. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both and restart Unity.");
                 return;
             }
 
@@ -250,17 +253,148 @@ namespace GTAWorld.Game.Editor
 
             object bothValue = null;
             if (property.PropertyType.IsEnum) {
-                bothValue = Enum.Parse(property.PropertyType, "Both");
+                var names = Enum.GetNames(property.PropertyType);
+                for (int i = 0; i < names.Length; ++i) {
+                    if (names[i] == "Both") {
+                        bothValue = Enum.Parse(property.PropertyType, names[i]);
+                        break;
+                    }
+                }
             } else if (property.PropertyType == typeof(int)) {
                 bothValue = 2;
             }
             if (bothValue == null) {
-                Debug.LogWarning("Could not determine the Unity Active Input Handling enum value. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both.");
+                SetSerializedActiveInputHandlingBoth();
+                Debug.LogWarning("Could not determine the Unity Active Input Handling enum value; serialized project setting was updated instead. If Opsive still logs UnityEngine.Input errors, set Project Settings > Player > Active Input Handling to Both and restart Unity.");
                 return;
             }
 
             property.SetValue(null, bothValue, null);
+            SetSerializedActiveInputHandlingBoth();
             Debug.Log("Unity Active Input Handling set to Both for legacy Opsive keyboard/mouse input.");
+        }
+
+        private static void SetSerializedActiveInputHandlingBoth()
+        {
+            var projectSettingsAssets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
+            if (projectSettingsAssets == null || projectSettingsAssets.Length == 0 || projectSettingsAssets[0] == null) {
+                return;
+            }
+
+            var serializedSettings = new SerializedObject(projectSettingsAssets[0]);
+            var activeInputHandler = serializedSettings.FindProperty("activeInputHandler") ?? serializedSettings.FindProperty("m_ActiveInputHandler");
+            if (activeInputHandler != null) {
+                activeInputHandler.intValue = 2; // Both: legacy Input Manager + new Input System.
+                serializedSettings.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        private static void EnsureRequiredOpsiveKeyboardAxes()
+        {
+            var inputManagerAssets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/InputManager.asset");
+            if (inputManagerAssets == null || inputManagerAssets.Length == 0 || inputManagerAssets[0] == null) {
+                Debug.LogWarning("ProjectSettings/InputManager.asset was not found. Open Tools > Third Person Controller > Start Window and run Update Project if Opsive still reports missing buttons.");
+                return;
+            }
+
+            var inputManager = new SerializedObject(inputManagerAssets[0]);
+            var axes = inputManager.FindProperty("m_Axes");
+            if (axes == null) {
+                Debug.LogWarning("InputManager m_Axes was not found. Open Tools > Third Person Controller > Start Window and run Update Project if Opsive still reports missing buttons.");
+                return;
+            }
+
+            UpsertInputAxis(axes, "Horizontal", "left", "right", "a", "d", 1000f, 0.001f, 3f, true, false, 0, 0);
+            UpsertInputAxis(axes, "Vertical", "down", "up", "s", "w", 1000f, 0.001f, 3f, true, false, 0, 0);
+            UpsertInputAxis(axes, "Fire1", string.Empty, "left ctrl", string.Empty, "mouse 0", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Fire2", string.Empty, string.Empty, string.Empty, "mouse 1", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Jump", string.Empty, "space", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Mouse X", string.Empty, string.Empty, string.Empty, string.Empty, 0f, 0f, 0.1f, false, false, 1, 0);
+            UpsertInputAxis(axes, "Mouse Y", string.Empty, string.Empty, string.Empty, string.Empty, 0f, 0f, 0.1f, false, false, 1, 1);
+            UpsertInputAxis(axes, "Change Speeds", string.Empty, "left shift", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Crouch", string.Empty, "c", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Reload", string.Empty, "r", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Next Item", string.Empty, "e", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Previous Item", string.Empty, "q", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Equip First Item", string.Empty, "1", string.Empty, "[1]", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Equip Second Item", string.Empty, "2", string.Empty, "[2]", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Equip Third Item", string.Empty, "3", string.Empty, "[3]", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Equip Fourth Item", string.Empty, "4", string.Empty, "[4]", 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Action", string.Empty, "f", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Secondary", string.Empty, "g", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+            UpsertInputAxis(axes, "Toggle Item Wheel", string.Empty, "tab", string.Empty, string.Empty, 1000f, 0.001f, 1000f, false, false, 0, 0);
+
+            inputManager.ApplyModifiedPropertiesWithoutUndo();
+            Debug.Log("Required Opsive keyboard/mouse InputManager axes verified.");
+        }
+
+        private static void UpsertInputAxis(SerializedProperty axes, string name, string negativeButton, string positiveButton, string altNegativeButton, string altPositiveButton, float gravity, float dead, float sensitivity, bool snap, bool invert, int type, int axis)
+        {
+            var axisProperty = FindInputAxis(axes, name);
+            if (axisProperty == null) {
+                axes.arraySize++;
+                axisProperty = axes.GetArrayElementAtIndex(axes.arraySize - 1);
+            }
+
+            SetRelativeString(axisProperty, "m_Name", name);
+            SetRelativeString(axisProperty, "descriptiveName", string.Empty);
+            SetRelativeString(axisProperty, "descriptiveNegativeName", string.Empty);
+            SetRelativeString(axisProperty, "negativeButton", negativeButton);
+            SetRelativeString(axisProperty, "positiveButton", positiveButton);
+            SetRelativeString(axisProperty, "altNegativeButton", altNegativeButton);
+            SetRelativeString(axisProperty, "altPositiveButton", altPositiveButton);
+            SetRelativeFloat(axisProperty, "gravity", gravity);
+            SetRelativeFloat(axisProperty, "dead", dead);
+            SetRelativeFloat(axisProperty, "sensitivity", sensitivity);
+            SetRelativeBool(axisProperty, "snap", snap);
+            SetRelativeBool(axisProperty, "invert", invert);
+            SetRelativeInt(axisProperty, "type", type);
+            SetRelativeInt(axisProperty, "axis", axis);
+            SetRelativeInt(axisProperty, "joyNum", 0);
+        }
+
+        private static SerializedProperty FindInputAxis(SerializedProperty axes, string name)
+        {
+            for (int i = 0; i < axes.arraySize; ++i) {
+                var axisProperty = axes.GetArrayElementAtIndex(i);
+                var nameProperty = axisProperty.FindPropertyRelative("m_Name");
+                if (nameProperty != null && nameProperty.stringValue == name) {
+                    return axisProperty;
+                }
+            }
+            return null;
+        }
+
+        private static void SetRelativeString(SerializedProperty property, string relativeName, string value)
+        {
+            var relative = property.FindPropertyRelative(relativeName);
+            if (relative != null) {
+                relative.stringValue = value;
+            }
+        }
+
+        private static void SetRelativeFloat(SerializedProperty property, string relativeName, float value)
+        {
+            var relative = property.FindPropertyRelative(relativeName);
+            if (relative != null) {
+                relative.floatValue = value;
+            }
+        }
+
+        private static void SetRelativeBool(SerializedProperty property, string relativeName, bool value)
+        {
+            var relative = property.FindPropertyRelative(relativeName);
+            if (relative != null) {
+                relative.boolValue = value;
+            }
+        }
+
+        private static void SetRelativeInt(SerializedProperty property, string relativeName, int value)
+        {
+            var relative = property.FindPropertyRelative(relativeName);
+            if (relative != null) {
+                relative.intValue = value;
+            }
         }
 
         private static void InvokeStaticEditorMethod(string typeName, string methodName)
@@ -347,7 +481,7 @@ namespace GTAWorld.Game.Editor
 
             EnsureComponent<GameProceduralLocomotionAnimator>(opsivePlayer);
             EnsureComponent<GameFallbackWeaponController>(opsivePlayer).SetWeaponPrefabs(LoadWeaponPreviewPrefabs());
-            EnsureComponent<GameOpsiveRuntimeBridge>(opsivePlayer).SetDefaultItemTypes(BuildGeneratedOpsiveLoadout(opsivePlayer));
+            EnsureComponent<GameOpsiveRuntimeBridge>(opsivePlayer).SetDefaultItemTypes(new UnityEngine.Object[0]);
         }
 
         private static void HideOriginalCharacterRenderers(Transform root, Transform exceptRoot)

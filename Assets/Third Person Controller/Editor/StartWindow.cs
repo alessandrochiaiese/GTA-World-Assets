@@ -2,7 +2,7 @@
 using UnityEditor;
 using System;
 using System.IO;
-#if ENABLE_MULTIPLAYER
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
 using UnityEngine.Networking;
 #endif
 
@@ -412,7 +412,7 @@ namespace Opsive.ThirdPersonController.Editor
             AddComponent(gameGameObject, typeof(Opsive.ThirdPersonController.DecalManager), typeof(Opsive.ThirdPersonController.Wrappers.DecalManager));
             AddComponent(gameGameObject, typeof(Opsive.ThirdPersonController.LayerManager), typeof(Opsive.ThirdPersonController.Wrappers.LayerManager));
             AddComponent(gameGameObject, typeof(Opsive.ThirdPersonController.ObjectManager), typeof(Opsive.ThirdPersonController.Wrappers.ObjectManager));
-#if ENABLE_MULTIPLAYER
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
             AddComponent(gameGameObject, typeof(NetworkIdentity), typeof(NetworkIdentity));
 #endif
 

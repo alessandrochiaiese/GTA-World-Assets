@@ -54,11 +54,17 @@ namespace Opsive.ThirdPersonController.Editor
                 EditorGUI.indentLevel++;
                 if (m_ReordableDefaultLoadout == null) {
                     var defaultLoadoutProperty = PropertyFromName(serializedObject, "m_DefaultLoadout");
-                    m_ReordableDefaultLoadout = new ReorderableList(serializedObject, defaultLoadoutProperty, true, true, true, true);
-                    m_ReordableDefaultLoadout.drawHeaderCallback = OnItemAmountHeaderDraw;
-                    m_ReordableDefaultLoadout.drawElementCallback = OnItemAmountElementDraw;
+                    if (defaultLoadoutProperty != null) {
+                        m_ReordableDefaultLoadout = new ReorderableList(serializedObject, defaultLoadoutProperty, true, true, true, true);
+                        m_ReordableDefaultLoadout.drawHeaderCallback = OnItemAmountHeaderDraw;
+                        m_ReordableDefaultLoadout.drawElementCallback = OnItemAmountElementDraw;
+                    }
                 }
-                m_ReordableDefaultLoadout.DoLayoutList();
+                if (m_ReordableDefaultLoadout != null) {
+                    m_ReordableDefaultLoadout.DoLayoutList();
+                } else {
+                    EditorGUILayout.HelpBox("Default loadout is not available on this legacy runtime component.", MessageType.Info);
+                }
                 EditorGUI.indentLevel--;
             }
 
@@ -66,10 +72,16 @@ namespace Opsive.ThirdPersonController.Editor
                 EditorGUI.indentLevel++;
                 if (m_ReordableItemOrder == null) {
                     var itemOrderProperty = PropertyFromName(serializedObject, "m_ItemOrder");
-                    m_ReordableItemOrder = new ReorderableList(serializedObject, itemOrderProperty, true, false, true, true);
-                    m_ReordableItemOrder.drawElementCallback = OnItemOrderDraw;
+                    if (itemOrderProperty != null) {
+                        m_ReordableItemOrder = new ReorderableList(serializedObject, itemOrderProperty, true, false, true, true);
+                        m_ReordableItemOrder.drawElementCallback = OnItemOrderDraw;
+                    }
                 }
-                m_ReordableItemOrder.DoLayoutList();
+                if (m_ReordableItemOrder != null) {
+                    m_ReordableItemOrder.DoLayoutList();
+                } else {
+                    EditorGUILayout.HelpBox("Item order is not available on this legacy runtime component.", MessageType.Info);
+                }
                 EditorGUI.indentLevel--;
             }
 

@@ -21,6 +21,7 @@ namespace GTAWorld.Game
         [SerializeField] private float m_AnimatorDampTime = 0.08f;
 
         private CharacterController m_CharacterController;
+        private Rigidbody m_Rigidbody;
         private RuntimeAnimatorController m_CachedAnimatorController;
         private bool m_HasHorizontalInput;
         private bool m_HasForwardInput;
@@ -29,6 +30,7 @@ namespace GTAWorld.Game
         private void Awake()
         {
             m_CharacterController = GetComponent<CharacterController>();
+            m_Rigidbody = GetComponent<Rigidbody>();
             if (m_Camera == null) {
                 m_Camera = Camera.main;
             }
@@ -56,12 +58,19 @@ namespace GTAWorld.Game
 
             if (m_CharacterController != null && m_CharacterController.enabled) {
                 m_CharacterController.Move(delta);
+            } else if (m_Rigidbody != null && !m_Rigidbody.isKinematic) {
+                m_Rigidbody.MovePosition(m_Rigidbody.position + delta);
             } else {
                 transform.position += delta;
             }
 
             var targetRotation = Quaternion.LookRotation(moveDirection, Vector3.up);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * m_RotationSpeed);
+            var rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * m_RotationSpeed);
+            if (m_Rigidbody != null && !m_Rigidbody.isKinematic) {
+                m_Rigidbody.MoveRotation(rotation);
+            } else {
+                transform.rotation = rotation;
+            }
         }
 
         private Vector2 ReadMovement()

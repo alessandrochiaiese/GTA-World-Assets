@@ -68,9 +68,21 @@ namespace GTAWorld.Game.Editor
         };
 
         private static readonly string[] OpsiveCameraComponents = {
+            "Opsive.ThirdPersonController.CameraHandler",
             "Opsive.ThirdPersonController.Wrappers.CameraHandler",
+            "Opsive.ThirdPersonController.CameraMonitor",
             "Opsive.ThirdPersonController.Wrappers.CameraMonitor",
+            "Opsive.ThirdPersonController.CameraController",
             "Opsive.ThirdPersonController.Wrappers.CameraController"
+        };
+
+        private static readonly string[] OpsiveInputDrivenPlayerComponents = {
+            "Opsive.ThirdPersonController.ControllerHandler",
+            "Opsive.ThirdPersonController.Wrappers.ControllerHandler",
+            "Opsive.ThirdPersonController.InventoryHandler",
+            "Opsive.ThirdPersonController.Wrappers.InventoryHandler",
+            "Opsive.ThirdPersonController.ItemHandler",
+            "Opsive.ThirdPersonController.Wrappers.ItemHandler"
         };
 
         private static readonly string[] WeaponPickupPrefabPaths = {
@@ -213,7 +225,8 @@ namespace GTAWorld.Game.Editor
                     anchor.PlayerSpawnPoint = opsivePlayer.transform;
                     CreateOsmPlaceholderCity(anchor.MapRoot);
                 }
-                CreateOrUpdateGameplayCamera(opsivePlayer.transform);
+                var camera = CreateOrUpdateGameplayCamera(opsivePlayer.transform);
+                DisableBehavioursByName(camera != null ? camera.gameObject : null, OpsiveCameraComponents);
             }
 
             var game = CreateOrUpdateGameBootstrap();
@@ -479,6 +492,8 @@ namespace GTAWorld.Game.Editor
             integration.AutoBind();
             integration.SetMale();
 
+            EnsureComponent<GameSimplePlayerMover>(opsivePlayer);
+            DisableBehavioursByName(opsivePlayer, OpsiveInputDrivenPlayerComponents);
             EnsureComponent<GameProceduralLocomotionAnimator>(opsivePlayer);
             EnsureComponent<GameFallbackWeaponController>(opsivePlayer).SetWeaponPrefabs(LoadWeaponPreviewPrefabs());
             EnsureComponent<GameOpsiveRuntimeBridge>(opsivePlayer).SetDefaultItemTypes(new UnityEngine.Object[0]);
@@ -1282,6 +1297,27 @@ namespace GTAWorld.Game.Editor
                 component = Undo.AddComponent<T>(target);
             }
             return component;
+        }
+
+        private static void DisableBehavioursByName(GameObject target, string[] typeNames)
+        {
+            if (target == null || typeNames == null) {
+                return;
+            }
+
+            for (int i = 0; i < typeNames.Length; ++i) {
+                var type = FindType(typeNames[i]);
+                if (type == null || !typeof(Behaviour).IsAssignableFrom(type)) {
+                    continue;
+                }
+                var behaviours = target.GetComponentsInChildren(type, true);
+                for (int j = 0; j < behaviours.Length; ++j) {
+                    var behaviour = behaviours[j] as Behaviour;
+                    if (behaviour != null) {
+                        behaviour.enabled = false;
+                    }
+                }
+            }
         }
 
         private static void RemoveComponentsByName(GameObject target, string[] typeNames)

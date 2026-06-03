@@ -1,3 +1,4 @@
+#if ENABLE_MULTIPLAYER && OPSIVE_LEGACY_UNET
 namespace Opsive.ThirdPersonController.Wrappers
 {
     /// <summary>
@@ -9,3 +10,4 @@ namespace Opsive.ThirdPersonController.Wrappers
         // Intentionally left blank. The parent class has all of the implementation.
     }
 }
+#endif

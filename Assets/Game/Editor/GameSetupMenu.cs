@@ -496,7 +496,9 @@ namespace GTAWorld.Game.Editor
 
             EnsureComponent<GameSimplePlayerMover>(opsivePlayer);
             DisableBehavioursByName(opsivePlayer, OpsiveInputDrivenPlayerComponents);
-            EnsureComponent<GameProceduralLocomotionAnimator>(opsivePlayer);
+            var proceduralLocomotion = EnsureComponent<GameProceduralLocomotionAnimator>(opsivePlayer);
+            proceduralLocomotion.Animator = animator;
+            proceduralLocomotion.PositionSource = opsivePlayer.transform;
             EnsureComponent<GameFallbackWeaponController>(opsivePlayer).SetWeaponPrefabs(LoadWeaponPreviewPrefabs());
             EnsureComponent<GameOpsiveRuntimeBridge>(opsivePlayer).SetDefaultItemTypes(new UnityEngine.Object[0]);
         }
@@ -624,7 +626,9 @@ namespace GTAWorld.Game.Editor
             integration.SetMale();
 
             EnsureComponent<GameSimplePlayerMover>(avatar);
-            EnsureComponent<GameProceduralLocomotionAnimator>(avatar);
+            var proceduralLocomotion = EnsureComponent<GameProceduralLocomotionAnimator>(avatar);
+            proceduralLocomotion.Animator = avatar.GetComponentInChildren<Animator>();
+            proceduralLocomotion.PositionSource = avatar.transform;
             ConfigureFullOpsiveSystem(avatar);
         }
 
@@ -793,6 +797,7 @@ namespace GTAWorld.Game.Editor
 
             var follow = EnsureComponent<GameThirdPersonCameraFollow>(camera.gameObject);
             follow.Target = target;
+            follow.SnapToTarget();
             return camera;
         }
 

@@ -17,6 +17,10 @@ namespace GTAWorld.Game
         [SerializeField] private float m_LegSwing = 18f;
         [SerializeField] private float m_BodyBob = 0.035f;
         [SerializeField] private bool m_EnableWhenAnimatorHasController = true;
+        [SerializeField] private Transform m_PositionSource;
+
+        public Animator Animator { get { return m_Animator; } set { m_Animator = value; RebindBones(); } }
+        public Transform PositionSource { get { return m_PositionSource; } set { m_PositionSource = value; ResetLastPosition(); } }
 
         private Transform m_LeftUpperArm;
         private Transform m_RightUpperArm;
@@ -34,12 +38,12 @@ namespace GTAWorld.Game
         private void Awake()
         {
             RebindBones();
-            m_LastPosition = transform.position;
+            ResetLastPosition();
         }
 
         private void LateUpdate()
         {
-            if (m_Animator == null || !m_Animator.isHuman) {
+            if (m_Animator == null || !m_Animator.isHuman || m_LeftUpperArm == null || m_RightUpperArm == null || m_LeftUpperLeg == null || m_RightUpperLeg == null) {
                 RebindBones();
             }
             if (m_Animator == null || !m_Animator.isHuman) {
@@ -49,8 +53,10 @@ namespace GTAWorld.Game
                 return;
             }
 
-            var velocity = (transform.position - m_LastPosition) / Mathf.Max(Time.deltaTime, 0.0001f);
-            m_LastPosition = transform.position;
+            var source = m_PositionSource != null ? m_PositionSource : transform;
+            var currentPosition = source.position;
+            var velocity = (currentPosition - m_LastPosition) / Mathf.Max(Time.deltaTime, 0.0001f);
+            m_LastPosition = currentPosition;
             velocity.y = 0f;
             var movement = Mathf.Clamp01(velocity.magnitude / 4.5f);
             if (movement < m_MinimumMoveSpeed) {
@@ -66,6 +72,12 @@ namespace GTAWorld.Game
             ApplyLocalX(m_LeftUpperLeg, m_LeftUpperLegBase, swing * m_LegSwing * movement);
             ApplyLocalX(m_RightUpperLeg, m_RightUpperLegBase, oppositeSwing * m_LegSwing * movement);
             ApplyLocalZ(m_Spine, m_SpineBase, Mathf.Sin(m_Cycle * 2f) * m_BodyBob * 100f * movement);
+        }
+
+        private void ResetLastPosition()
+        {
+            var source = m_PositionSource != null ? m_PositionSource : transform;
+            m_LastPosition = source.position;
         }
 
         [ContextMenu("Rebind Procedural Bones")]

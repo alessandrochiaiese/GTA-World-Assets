@@ -77,6 +77,8 @@ namespace GTAWorld.Game.Editor
         };
 
         private static readonly string[] OpsiveInputDrivenPlayerComponents = {
+            "Opsive.ThirdPersonController.RigidbodyCharacterController",
+            "Opsive.ThirdPersonController.Wrappers.RigidbodyCharacterController",
             "Opsive.ThirdPersonController.ControllerHandler",
             "Opsive.ThirdPersonController.Wrappers.ControllerHandler",
             "Opsive.ThirdPersonController.InventoryHandler",

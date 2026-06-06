@@ -19,6 +19,7 @@ namespace GTAWorld.Game
         [SerializeField] private Camera m_Camera;
         [SerializeField] private Animator m_Animator;
         [SerializeField] private float m_AnimatorDampTime = 0.08f;
+        [SerializeField] private bool m_ForceKinematicRigidbody = true;
 
         private CharacterController m_CharacterController;
         private Rigidbody m_Rigidbody;
@@ -34,6 +35,7 @@ namespace GTAWorld.Game
             if (m_Camera == null) {
                 m_Camera = Camera.main;
             }
+            PrepareRigidbodyForFallbackMovement();
             EnsureAnimator();
             CacheAnimatorParameters();
         }
@@ -46,6 +48,7 @@ namespace GTAWorld.Game
         private void Update()
         {
             EnsureAnimator();
+            PrepareRigidbodyForFallbackMovement();
             var movement = ReadMovement();
             UpdateAnimator(movement);
             if (movement.sqrMagnitude < 0.001f) {
@@ -58,19 +61,30 @@ namespace GTAWorld.Game
 
             if (m_CharacterController != null && m_CharacterController.enabled) {
                 m_CharacterController.Move(delta);
-            } else if (m_Rigidbody != null && !m_Rigidbody.isKinematic) {
-                m_Rigidbody.MovePosition(m_Rigidbody.position + delta);
             } else {
                 transform.position += delta;
             }
 
             var targetRotation = Quaternion.LookRotation(moveDirection, Vector3.up);
-            var rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * m_RotationSpeed);
-            if (m_Rigidbody != null && !m_Rigidbody.isKinematic) {
-                m_Rigidbody.MoveRotation(rotation);
-            } else {
-                transform.rotation = rotation;
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * m_RotationSpeed);
+        }
+
+        private void PrepareRigidbodyForFallbackMovement()
+        {
+            if (!m_ForceKinematicRigidbody || m_Rigidbody == null) {
+                return;
             }
+
+            if (!m_Rigidbody.isKinematic) {
+#if UNITY_6000_0_OR_NEWER
+                m_Rigidbody.linearVelocity = Vector3.zero;
+#else
+                m_Rigidbody.velocity = Vector3.zero;
+#endif
+                m_Rigidbody.angularVelocity = Vector3.zero;
+                m_Rigidbody.isKinematic = true;
+            }
+            m_Rigidbody.useGravity = false;
         }
 
         private Vector2 ReadMovement()
